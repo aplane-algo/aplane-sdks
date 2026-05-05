@@ -1,6 +1,6 @@
 # APlane SDKs
 
-MIT-licensed SDKs for integrating applications and agents with `apsigner`.
+SDKs for integrating applications and agents with `apsigner`.
 
 This repository contains the public client SDKs only. The main APlane
 application, signer, shell, LogicSig providers, and operational tooling live in
