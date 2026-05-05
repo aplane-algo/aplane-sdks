@@ -1,0 +1,733 @@
+# SPDX-License-Identifier: MIT
+# Copyright (C) 2026 APlane Project LLC
+
+"""Tests for aplane Python SDK client."""
+
+import base64
+import json
+from unittest.mock import patch, MagicMock
+import os
+
+import pytest
+
+from aplane.signer import (
+    SignerClient,
+    AuthenticationError,
+    SigningRejectedError,
+    SignerUnavailableError,
+    SignerError,
+    KeyNotFoundError,
+    KeyDeletionError,
+    assemble_group,
+    load_config,
+    SSHConfig,
+    ClientConfig,
+    request_token,
+    request_token_to_file,
+)
+
+
+def make_client(base_url="http://localhost:11270", token="test-token"):
+    """Create a SignerClient with no SSH tunnel."""
+    return SignerClient(base_url, token, timeout=10)
+
+
+def mock_response(status_code=200, json_data=None, text=""):
+    """Create a mock requests.Response."""
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.text = text
+    resp.content = json.dumps(json_data).encode() if json_data else b""
+    resp.json.return_value = json_data if json_data else {}
+    return resp
+
+
+# ---------------------------------------------------------------------------
+# health
+# ---------------------------------------------------------------------------
+
+class TestHealth:
+    def test_healthy(self):
+        client = make_client()
+        with patch.object(client.session, "get", return_value=mock_response(200)):
+            assert client.health() is True
+
+    def test_unhealthy(self):
+        client = make_client()
+        with patch.object(client.session, "get", return_value=mock_response(503)):
+            assert client.health() is False
+
+    def test_network_error(self):
+        import requests as req
+        client = make_client()
+        with patch.object(client.session, "get", side_effect=req.ConnectionError("refused")):
+            assert client.health() is False
+
+    def test_uses_client_timeout(self):
+        client = make_client()
+        with patch.object(client.session, "get", return_value=mock_response(200)) as mock_get:
+            assert client.health() is True
+        assert mock_get.call_args.kwargs["timeout"] == 10
+
+
+# ---------------------------------------------------------------------------
+# list_keys
+# ---------------------------------------------------------------------------
+
+class TestListKeys:
+    def test_returns_keys(self):
+        client = make_client()
+        resp = mock_response(200, {
+            "count": 2,
+            "keys": [
+                {"address": "ADDR1", "key_type": "ed25519", "public_key_hex": "abcd", "lsig_size": 0},
+                {"address": "ADDR2", "key_type": "falcon1024-v1", "lsig_size": 3035},
+            ],
+        })
+        with patch.object(client.session, "get", return_value=resp):
+            keys = client.list_keys()
+
+        assert len(keys) == 2
+        assert keys[0].address == "ADDR1"
+        assert keys[0].key_type == "ed25519"
+        assert keys[0].public_key_hex == "abcd"
+        assert keys[1].lsig_size == 3035
+
+    def test_auth_error(self):
+        client = make_client()
+        with patch.object(client.session, "get", return_value=mock_response(401)):
+            with pytest.raises(AuthenticationError):
+                client.list_keys()
+
+    def test_cache(self):
+        client = make_client()
+        resp = mock_response(200, {
+            "count": 1,
+            "keys": [{"address": "ADDR1", "key_type": "ed25519"}],
+        })
+        with patch.object(client.session, "get", return_value=resp) as mock_get:
+            client.list_keys()
+            client.list_keys()  # cached
+            assert mock_get.call_count == 1
+
+            client.list_keys(refresh=True)
+            assert mock_get.call_count == 2
+
+    def test_refresh_clears_stale_cache_entries(self):
+        client = make_client()
+        first = mock_response(200, {
+            "count": 2,
+            "keys": [
+                {"address": "ADDR1", "key_type": "ed25519"},
+                {"address": "ADDR2", "key_type": "ed25519"},
+            ],
+        })
+        second = mock_response(200, {
+            "count": 1,
+            "keys": [
+                {"address": "ADDR1", "key_type": "ed25519"},
+            ],
+        })
+
+        with patch.object(client.session, "get", side_effect=[first, second]):
+            client.list_keys()
+            refreshed = client.list_keys(refresh=True)
+
+        assert len(refreshed) == 1
+        assert refreshed[0].address == "ADDR1"
+        assert "ADDR2" not in client._key_cache
+
+    def test_uses_client_timeout(self):
+        client = make_client()
+        with patch.object(client.session, "get", return_value=mock_response(200, {"count": 0, "keys": []})) as mock_get:
+            client.list_keys(refresh=True)
+        assert mock_get.call_args.kwargs["timeout"] == 10
+
+
+# ---------------------------------------------------------------------------
+# list_key_types
+# ---------------------------------------------------------------------------
+
+class TestListKeyTypes:
+    def test_returns_key_types(self):
+        client = make_client()
+        resp = mock_response(200, {
+            "key_types": [
+                {
+                    "key_type": "ed25519",
+                    "family": "ed25519",
+                    "display_name": "Ed25519",
+                    "requires_logicsig": False,
+                },
+                {
+                    "key_type": "falcon1024-v1",
+                    "family": "falcon",
+                    "requires_logicsig": True,
+                    "creation_params": [
+                        {"name": "network", "label": "Network", "type": "string", "required": True},
+                        {
+                            "name": "recipients",
+                            "label": "Recipients",
+                            "type": "address[]",
+                            "required": True,
+                        },
+                    ],
+                },
+            ],
+        })
+        with patch.object(client.session, "get", return_value=resp):
+            types = client.list_key_types()
+
+        assert len(types) == 2
+        assert types[0].key_type == "ed25519"
+        assert types[0].family == "ed25519"
+        assert types[1].key_type == "falcon1024-v1"
+        assert types[1].creation_params is not None
+        assert len(types[1].creation_params) == 2
+        assert types[1].creation_params[0].name == "network"
+        assert types[1].creation_params[1].param_type == "address[]"
+
+    def test_auth_error(self):
+        client = make_client()
+        with patch.object(client.session, "get", return_value=mock_response(401)):
+            with pytest.raises(AuthenticationError):
+                client.list_key_types()
+
+    def test_uses_client_timeout(self):
+        client = make_client()
+        with patch.object(client.session, "get", return_value=mock_response(200, {"key_types": []})) as mock_get:
+            client.list_key_types()
+        assert mock_get.call_args.kwargs["timeout"] == 10
+
+
+# ---------------------------------------------------------------------------
+# generate_key
+# ---------------------------------------------------------------------------
+
+class TestGenerateKey:
+    def test_generates_key(self):
+        client = make_client()
+        resp = mock_response(200, {
+            "address": "NEWADDR123",
+            "key_type": "ed25519",
+        })
+        with patch.object(client.session, "post", return_value=resp):
+            result = client.generate_key("ed25519")
+
+        assert result.address == "NEWADDR123"
+        assert result.key_type == "ed25519"
+
+    def test_with_parameters(self):
+        client = make_client()
+        resp = mock_response(200, {
+            "address": "NEWADDR456",
+            "key_type": "falcon1024-v1",
+            "parameters": {"network": "testnet"},
+        })
+        with patch.object(client.session, "post", return_value=resp) as mock_post:
+            result = client.generate_key("falcon1024-v1", {"network": "testnet"})
+
+        assert result.address == "NEWADDR456"
+        assert result.parameters == {"network": "testnet"}
+
+        # Verify request body
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]["json"] if "json" in call_kwargs[1] else json.loads(call_kwargs[1].get("data", "{}"))
+        assert body["key_type"] == "falcon1024-v1"
+
+    def test_auth_error(self):
+        client = make_client()
+        with patch.object(client.session, "post", return_value=mock_response(401)):
+            with pytest.raises(AuthenticationError):
+                client.generate_key("ed25519")
+
+    def test_locked_error(self):
+        client = make_client()
+        with patch.object(client.session, "post", return_value=mock_response(403)):
+            with pytest.raises(SignerUnavailableError):
+                client.generate_key("ed25519")
+
+    def test_missing_required_fields(self):
+        client = make_client()
+        resp = mock_response(200, {"key_type": "ed25519"})
+        with patch.object(client.session, "post", return_value=resp):
+            with pytest.raises(SignerError, match="missing address"):
+                client.generate_key("ed25519")
+
+    def test_uses_client_timeout(self):
+        client = make_client()
+        resp = mock_response(200, {"address": "NEWADDR123", "key_type": "ed25519"})
+        with patch.object(client.session, "post", return_value=resp) as mock_post:
+            client.generate_key("ed25519")
+        assert mock_post.call_args.kwargs["timeout"] == 10
+
+
+# ---------------------------------------------------------------------------
+# delete_key
+# ---------------------------------------------------------------------------
+
+class TestDeleteKey:
+    def test_deletes_key(self):
+        client = make_client()
+        resp = mock_response(200, {})
+        with patch.object(client.session, "delete", return_value=resp):
+            client.delete_key("ADDR_TO_DELETE")  # should not raise
+
+    def test_not_found(self):
+        client = make_client()
+        resp = mock_response(404, {"error": "Key not found: MISSING"})
+        with patch.object(client.session, "delete", return_value=resp):
+            with pytest.raises(KeyDeletionError):
+                client.delete_key("MISSING")
+
+    def test_auth_error(self):
+        client = make_client()
+        with patch.object(client.session, "delete", return_value=mock_response(401)):
+            with pytest.raises(AuthenticationError):
+                client.delete_key("ADDR")
+
+    def test_uses_client_timeout(self):
+        client = make_client()
+        with patch.object(client.session, "delete", return_value=mock_response(200, {})) as mock_delete:
+            client.delete_key("ADDR")
+        assert mock_delete.call_args.kwargs["timeout"] == 10
+
+
+# ---------------------------------------------------------------------------
+# plan_group
+# ---------------------------------------------------------------------------
+
+class TestPlanGroup:
+    def _make_mock_txn(self, sender="SENDER_ADDR"):
+        txn = MagicMock()
+        txn.sender = sender
+        txn.dictify.return_value = {}
+        txn.get_txid.return_value = "TXID"
+        return txn
+
+    def test_returns_plan(self):
+        client = make_client()
+        resp = mock_response(200, {
+            "transactions": ["5458deadbeef", "5458cafebabe"],
+            "mutations": {
+                "dummies_added": 1,
+                "group_id_changed": True,
+                "original_count": 1,
+                "final_count": 2,
+            },
+        })
+        with patch.object(client.session, "post", return_value=resp), \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            result = client.plan_group([self._make_mock_txn()])
+
+        assert "transactions" in result
+        assert len(result["transactions"]) == 2
+        assert result["mutations"]["dummies_added"] == 1
+
+    def test_auth_error(self):
+        client = make_client()
+        with patch.object(client.session, "post", return_value=mock_response(401)), \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            with pytest.raises(AuthenticationError):
+                client.plan_group([self._make_mock_txn()])
+
+    def test_server_error_in_response(self):
+        client = make_client()
+        resp = mock_response(200, {"error": "Internal error"})
+        with patch.object(client.session, "post", return_value=resp), \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            with pytest.raises(SignerError):
+                client.plan_group([self._make_mock_txn()])
+
+
+class TestConfigAndConstruction:
+    def test_load_config_parse_error(self, tmp_path):
+        (tmp_path / "config.yaml").write_text("ssh:\n  host: [\n", encoding="utf-8")
+        with pytest.raises(SignerError, match="failed to parse config.yaml"):
+            load_config(str(tmp_path))
+
+    def test_constructor_requires_base_url(self):
+        with pytest.raises(SignerError, match="base_url is required"):
+            SignerClient("", "token")
+
+    def test_constructor_requires_token(self):
+        with pytest.raises(SignerError, match="token is required"):
+            SignerClient("http://localhost:11270", "")
+
+
+# ---------------------------------------------------------------------------
+# signing errors
+# ---------------------------------------------------------------------------
+
+class TestSigningErrors:
+    def _make_mock_txn(self, sender="SENDER_ADDR"):
+        txn = MagicMock()
+        txn.sender = sender
+        return txn
+
+    def test_auth_error(self):
+        client = make_client()
+        with patch.object(client.session, "post", return_value=mock_response(401)), \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            with pytest.raises(AuthenticationError):
+                client.sign_transaction(self._make_mock_txn())
+
+    def test_signing_rejected(self):
+        client = make_client()
+        resp = mock_response(403, {"error": "Operator rejected"})
+        with patch.object(client.session, "post", return_value=resp), \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            with pytest.raises(SigningRejectedError):
+                client.sign_transaction(self._make_mock_txn())
+
+    def test_signer_unavailable(self):
+        client = make_client()
+        resp = mock_response(503, {"error": "Signer locked"})
+        with patch.object(client.session, "post", return_value=resp), \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            with pytest.raises(SignerUnavailableError):
+                client.sign_transaction(self._make_mock_txn())
+
+    def test_key_not_found(self):
+        client = make_client()
+        resp = mock_response(400, {"error": "Key not found: INVALID_ADDRESS"})
+        with patch.object(client.session, "post", return_value=resp), \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            with pytest.raises(KeyNotFoundError):
+                client.sign_transaction(self._make_mock_txn())
+
+    def test_timeout(self):
+        import requests
+        client = make_client()
+        with patch.object(client.session, "post", side_effect=requests.ConnectionError("timed out")), \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            with pytest.raises(SignerUnavailableError):
+                client.sign_transaction(self._make_mock_txn())
+
+
+# ---------------------------------------------------------------------------
+# sign_transactions with foreign entries
+# ---------------------------------------------------------------------------
+
+class TestSignTransactionsForeign:
+    def _make_mock_txn(self, sender="SENDER_ADDR"):
+        txn = MagicMock()
+        txn.sender = sender
+        return txn
+
+    def test_rejects_foreign_in_sign_transactions(self):
+        client = make_client()
+        with patch.object(client.session, "post") as mock_post, \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            with pytest.raises(SignerError, match="foreign entries are only supported on /plan"):
+                client.sign_transactions(
+                    [self._make_mock_txn(), self._make_mock_txn()],
+                    auth_addresses=["AUTH1", None],
+                )
+        mock_post.assert_not_called()
+
+    def test_sign_transactions_list_rejects_foreign(self):
+        client = make_client()
+        with patch.object(client.session, "post") as mock_post, \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            with pytest.raises(SignerError, match="foreign entries are only supported on /plan"):
+                client.sign_transactions_list(
+                [self._make_mock_txn(), self._make_mock_txn()],
+                auth_addresses=["AUTH1", None],
+            )
+        mock_post.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# assemble_group
+# ---------------------------------------------------------------------------
+
+class TestBuildSignRequests:
+    def _make_mock_txn(self, sender="SENDER_ADDR"):
+        txn = MagicMock()
+        txn.sender = sender
+        return txn
+
+    def test_builds_request_with_auth_address(self):
+        client = make_client()
+        resp = mock_response(200, {"signed": ["deadbeef"]})
+        with patch.object(client.session, "post", return_value=resp) as mock_post, \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            client.sign_transaction(self._make_mock_txn(), auth_address="AUTH_ADDR")
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]["json"]
+        assert len(body["requests"]) == 1
+        assert body["requests"][0]["auth_address"] == "AUTH_ADDR"
+        assert body["requests"][0]["txn_bytes_hex"] == "deadbeef"
+
+    def test_defaults_auth_address_to_sender(self):
+        client = make_client()
+        resp = mock_response(200, {"signed": ["deadbeef"]})
+        with patch.object(client.session, "post", return_value=resp) as mock_post, \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "MY_SENDER")):
+            client.sign_transaction(self._make_mock_txn(sender="MY_SENDER"))
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]["json"]
+        assert body["requests"][0]["auth_address"] == "MY_SENDER"
+
+    def test_includes_lsig_args_as_hex(self):
+        client = make_client()
+        resp = mock_response(200, {"signed": ["deadbeef"]})
+        with patch.object(client.session, "post", return_value=resp) as mock_post, \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "LSIG_ADDR")):
+            client.sign_transaction(
+                self._make_mock_txn(sender="LSIG_ADDR"),
+                auth_address="LSIG_ADDR",
+                lsig_args={"preimage": b"secret"},
+            )
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]["json"]
+        assert body["requests"][0]["lsig_args"] is not None
+        assert body["requests"][0]["lsig_args"]["preimage"] == "736563726574"
+
+
+class TestFromEnv:
+    def test_throws_when_ssh_not_configured(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("signer_port: 11270\n")
+        token_file = tmp_path / "aplane.token"
+        token_file.write_text("test-token")
+
+        with pytest.raises(SignerError, match="No ssh block"):
+            SignerClient.from_env(data_dir=str(tmp_path))
+
+    def test_throws_when_ssh_host_empty(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("signer_port: 11270\nssh:\n  port: 1127\n")
+        token_file = tmp_path / "aplane.token"
+        token_file.write_text("test-token")
+
+        with pytest.raises(SignerError, match="ssh.host is required"):
+            SignerClient.from_env(data_dir=str(tmp_path))
+
+    def test_throws_when_token_missing(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("ssh:\n  host: example.com\n  port: 1127\n")
+        # No token file
+
+        with pytest.raises(SignerError, match="No token"):
+            SignerClient.from_env(data_dir=str(tmp_path))
+
+
+class TestSignReturnFormat:
+    def _make_mock_txn(self, sender="SENDER_ADDR"):
+        txn = MagicMock()
+        txn.sender = sender
+        return txn
+
+    def test_sign_transactions_list_returns_individual_base64(self):
+        client = make_client()
+        hex1 = b"signed-txn-1".hex()
+        hex2 = b"signed-txn-2".hex()
+        resp = mock_response(200, {"signed": [hex1, hex2]})
+        with patch.object(client.session, "post", return_value=resp), \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            result = client.sign_transactions_list(
+                [self._make_mock_txn(), self._make_mock_txn()]
+            )
+
+        assert len(result) == 2
+        assert base64.b64decode(result[0]) == b"signed-txn-1"
+        assert base64.b64decode(result[1]) == b"signed-txn-2"
+
+    def test_sign_transactions_returns_concatenated_base64(self):
+        client = make_client()
+        hex1 = b"signed-txn-1".hex()
+        hex2 = b"signed-txn-2".hex()
+        resp = mock_response(200, {"signed": [hex1, hex2]})
+        with patch.object(client.session, "post", return_value=resp), \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            result = client.sign_transactions(
+                [self._make_mock_txn(), self._make_mock_txn()]
+            )
+
+        decoded = base64.b64decode(result)
+        assert decoded == b"signed-txn-1signed-txn-2"
+
+    def test_sign_transactions_rejects_empty_slot(self):
+        client = make_client()
+        resp = mock_response(200, {"signed": [b"signed-txn-1".hex(), ""]})
+        with patch.object(client.session, "post", return_value=resp), \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            with pytest.raises(SignerError, match="empty signed transaction slot"):
+                client.sign_transactions(
+                    [self._make_mock_txn(), self._make_mock_txn()]
+                )
+
+    def test_sign_transactions_list_rejects_empty_slot(self):
+        client = make_client()
+        resp = mock_response(200, {"signed": [b"signed-txn-1".hex(), ""]})
+        with patch.object(client.session, "post", return_value=resp), \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            with pytest.raises(SignerError, match="empty signed transaction slot"):
+                client.sign_transactions_list(
+                    [self._make_mock_txn(), self._make_mock_txn()]
+                )
+
+
+class TestRequestTokenToFile:
+    def test_creates_token_file_with_secure_permissions(self, tmp_path):
+        (tmp_path / "config.yaml").write_text("ssh:\n  host: example.com\n  port: 1127\n")
+        ssh_dir = tmp_path / ".ssh"
+        ssh_dir.mkdir()
+        (ssh_dir / "id_ed25519").write_text("dummy-private-key")
+
+        with patch("aplane.signer.request_token", return_value="test-token"):
+            path = request_token_to_file(
+                data_dir=str(tmp_path),
+                host="example.com",
+            )
+
+        assert os.path.exists(path)
+        assert (tmp_path / "aplane.token").read_text() == "test-token"
+        mode = os.stat(path).st_mode & 0o777
+        assert mode == 0o600
+
+
+class TestAssembleGroup:
+    def test_merges_two_signers(self):
+        alice_signed = [
+            base64.b64encode(bytes([1, 2])).decode(),
+            "",
+            base64.b64encode(bytes([5, 6])).decode(),
+        ]
+        bob_signed = [
+            "",
+            base64.b64encode(bytes([3, 4])).decode(),
+            "",
+        ]
+
+        result = assemble_group([alice_signed, bob_signed])
+        expected = base64.b64encode(bytes([1, 2, 3, 4, 5, 6])).decode()
+        assert result == expected
+
+    def test_empty_input(self):
+        with pytest.raises(ValueError, match="must not be empty"):
+            assemble_group([])
+
+    def test_mismatched_lengths(self):
+        with pytest.raises(ValueError, match="expected 2"):
+            assemble_group([["a", "b"], ["c"]])
+
+    def test_no_signer_for_slot(self):
+        with pytest.raises(ValueError, match="slot 1: no signer"):
+            assemble_group([["a", ""], ["", ""]])
+
+    def test_multiple_signers_for_slot(self):
+        with pytest.raises(ValueError, match="slot 0: multiple signers"):
+            assemble_group([["a", "b"], ["c", "d"]])
+
+
+# ---------------------------------------------------------------------------
+# load_config
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# encoding utilities
+# ---------------------------------------------------------------------------
+
+class TestEncoding:
+    def test_encode_transaction(self):
+        """encode_transaction returns (hex, sender)."""
+        from aplane.signer import encode_transaction
+        txn = MagicMock()
+        txn.sender = "SENDER_ADDR"
+        txn.dictify.return_value = {"snd": b"\x00" * 32}
+        txn.get_txid.return_value = "TXID"
+
+        with patch("aplane.signer.encoding.msgpack_encode", return_value="gqNzbmTEIAAA"):
+            result = encode_transaction(txn)
+
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        assert isinstance(result[0], str)  # hex string
+        assert result[1] == "SENDER_ADDR"  # sender
+
+    def test_hex_round_trip(self):
+        """bytes -> hex -> bytes round-trip."""
+        original = bytes([0, 1, 255, 16, 171])
+        hex_str = original.hex()
+        assert hex_str == "0001ff10ab"
+        assert bytes.fromhex(hex_str) == original
+
+    def test_hex_empty(self):
+        assert bytes().hex() == ""
+        assert bytes.fromhex("") == b""
+
+    def test_base64_round_trip(self):
+        """hex -> base64 (like signed txn conversion)."""
+        hex_str = "deadbeef"
+        decoded = bytes.fromhex(hex_str)
+        b64 = base64.b64encode(decoded).decode()
+        assert base64.b64decode(b64) == decoded
+
+    def test_concatenate_signed_txns(self):
+        """Concatenate hex strings to base64 (like signTransaction does)."""
+        hexes = ["0102", "0304"]
+        all_bytes = b"".join(bytes.fromhex(h) for h in hexes)
+        result = base64.b64encode(all_bytes).decode()
+        assert result == "AQIDBA=="
+
+    def test_concatenate_single(self):
+        hexes = ["deadbeef"]
+        all_bytes = b"".join(bytes.fromhex(h) for h in hexes)
+        result = base64.b64encode(all_bytes).decode()
+        assert result == "3q2+7w=="
+
+
+# ---------------------------------------------------------------------------
+# load_config
+# ---------------------------------------------------------------------------
+
+class TestLoadConfig:
+    def test_default_config(self, tmp_path):
+        config = load_config(str(tmp_path))
+        assert config.signer_port == 11270
+        assert config.ssh is None
+
+    def test_with_ssh(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(
+            "signer_port: 12345\n"
+            "ssh:\n"
+            "  host: signer.example.com\n"
+            "  port: 2222\n"
+            "  identity_file: .ssh/mykey\n"
+            "  known_hosts_path: .ssh/hosts\n"
+            "  trust_on_first_use: true\n"
+        )
+        config = load_config(str(tmp_path))
+        assert config.signer_port == 12345
+        assert config.ssh is not None
+        assert config.ssh.host == "signer.example.com"
+        assert config.ssh.port == 2222
+        assert config.ssh.identity_file == ".ssh/mykey"
+        assert config.ssh.known_hosts_path == ".ssh/hosts"
+        assert config.ssh.trust_on_first_use is True
+
+    def test_trust_on_first_use_defaults_false(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(
+            "ssh:\n"
+            "  host: example.com\n"
+        )
+        config = load_config(str(tmp_path))
+        assert config.ssh.trust_on_first_use is False
+
+
+class TestRequestToken:
+    def test_rejects_unsupported_identity_locally(self):
+        with pytest.raises(SignerError, match="unsupported identity"):
+            request_token(
+                host="signer.example.com",
+                ssh_key_path="~/.ssh/id_ed25519",
+                identity="other-identity",
+            )
