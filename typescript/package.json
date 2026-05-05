@@ -9,6 +9,10 @@
     "url": "https://github.com/aplane-algo/aplane-sdks.git",
     "directory": "typescript"
   },
+  "homepage": "https://github.com/aplane-algo/aplane-sdks#readme",
+  "bugs": {
+    "url": "https://github.com/aplane-algo/aplane-sdks/issues"
+  },
   "keywords": [
     "algorand",
     "blockchain",
