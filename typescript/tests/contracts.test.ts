@@ -123,7 +123,7 @@ describe("signer API contract fixtures", () => {
 
     assert.equal(keys.length, 2);
     assert.equal(keys[1].publicKeyHex, "ffeeddccbbaa99887766554433221100");
-    assert.equal(keys[1].keyType, "timelock-v1");
+    assert.equal(keys[1].keyType, "aplane.timelock.v1");
     assert.equal(keys[1].lsigSize, 512);
     assert.equal(keys[1].isGenericLsig, true);
     assert.equal(keys[1].runtimeArgs?.[0].name, "preimage");
@@ -143,10 +143,11 @@ describe("signer API contract fixtures", () => {
     const keyTypes = await client.listKeyTypes();
     const timelock = keyTypes[1];
 
-    assert.equal(timelock.keyType, "timelock-v1");
+    assert.equal(timelock.keyType, "aplane.timelock.v1");
     assert.equal(timelock.displayName, "Timelock");
     assert.equal(timelock.requiresLogicsig, true);
     assert.equal(timelock.mnemonicWordCount, 0);
+    assert.equal(timelock.mnemonicImport, false);
     assert.equal(timelock.creationParams?.[1].paramType, "address[]");
     assert.equal(timelock.creationParams?.[1].minItems, 1);
     assert.equal(timelock.creationParams?.[1].maxItems, 8);
@@ -156,6 +157,31 @@ describe("signer API contract fixtures", () => {
     assert.equal(timelock.runtimeArgs?.[0].label, "Preimage");
     assert.equal(timelock.runtimeArgs?.[0].required, true);
     assert.equal(timelock.runtimeArgs?.[0].byteLength, 32);
+  });
+
+  it("maps optional /keys template warning fields", async () => {
+    mockFetch.mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: async () => ({
+        count: 1,
+        keys: [
+          {
+            address: "ADDR1",
+            public_key_hex: "abcd",
+            key_type: "aplane.timelock.v1",
+            template_status: "conflict",
+            template_warning: "template fingerprint differs",
+          },
+        ],
+      }),
+    });
+
+    const client = new SignerClient("http://localhost:11270", "test-token");
+    const keys = await client.listKeys(true);
+
+    assert.equal(keys[0].templateStatus, "conflict");
+    assert.equal(keys[0].templateWarning, "template fingerprint differs");
   });
 
   it("maps /plan mutation wire fields to public MutationReport fields", async () => {
@@ -193,12 +219,12 @@ describe("signer API contract fixtures", () => {
     });
 
     const client = new SignerClient("http://localhost:11270", "test-token");
-    const generated = await client.generateKey("timelock-v1", {
+    const generated = await client.generateKey("aplane.timelock.v1", {
       unlock_round: "123456",
     });
 
     assert.equal(generated.address, "GENERATEDADDR0000000000000000000000000000000000000000000");
-    assert.equal(generated.keyType, "timelock-v1");
+    assert.equal(generated.keyType, "aplane.timelock.v1");
     assert.equal(generated.parameters?.unlock_round, "123456");
   });
 });

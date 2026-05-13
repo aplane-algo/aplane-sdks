@@ -265,6 +265,8 @@ for (const key of keys) {
 - `lsigSize`
 - `isGenericLsig`
 - `runtimeArgs`
+- `templateStatus`
+- `templateWarning`
 
 ### List Key Types
 
@@ -280,6 +282,7 @@ This is the easiest way to discover:
 - available key families
 - creation parameters for generated keys
 - runtime args required by generic LogicSigs
+- explicit mnemonic import support through `mnemonicImport`
 
 ### Generate And Delete A Key
 

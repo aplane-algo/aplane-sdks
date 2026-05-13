@@ -259,6 +259,8 @@ Useful `KeyInfo` fields include:
 - `lsig_size`
 - `is_generic_lsig`
 - `runtime_args`
+- `template_status`
+- `template_warning`
 
 If you need one cached entry by address:
 
@@ -276,7 +278,8 @@ for kt in key_types:
 
 Use this to discover signer-supported key types rather than hard-coding them.
 Creation and runtime metadata are surfaced through `creation_params` and
-`runtime_args`.
+`runtime_args`. Explicit mnemonic import support is surfaced through
+`mnemonic_import`.
 
 ### Generate A Key
 
@@ -291,7 +294,7 @@ Key types with creation parameters take a string map:
 
 ```python
 result = client.generate_key(
-    "timelock-v1",
+    "aplane.timelock.v1",
     {
         "recipient": "ADDR1",
         "unlock_round": "123456",

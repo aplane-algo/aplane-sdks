@@ -7,17 +7,19 @@
       "description": "Native Algorand signing key",
       "requires_logicsig": false,
       "mnemonic_word_count": 25,
+      "mnemonic_import": true,
       "mnemonic_scheme": "algorand",
       "creation_params": [],
       "runtime_args": []
     },
     {
-      "key_type": "timelock-v1",
+      "key_type": "aplane.timelock.v1",
       "family": "generic",
       "display_name": "Timelock",
       "description": "Generic LogicSig with creation and runtime arguments",
       "requires_logicsig": true,
       "mnemonic_word_count": 0,
+      "mnemonic_import": false,
       "mnemonic_scheme": "",
       "creation_params": [
         {

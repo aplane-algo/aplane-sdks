@@ -1,7 +1,8 @@
 # Signer API Contract Fixtures
 
-These JSON files are committed golden fixtures for the signer HTTP API and SDK
-contract tests.
+These JSON files are committed golden fixtures for the signer HTTP API contract
+tests. The external `aplane-algo/aplane-sdks` repository also consumes this
+wire-contract shape for SDK compatibility tests.
 
 They are intentionally static. Do not regenerate them automatically during test
 runs. If a compatibility-bearing wire field changes, update these fixtures in

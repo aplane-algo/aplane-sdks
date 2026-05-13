@@ -202,6 +202,7 @@ type KeyTypeInfo struct {
 	Description       string          `json:"description"`
 	RequiresLogicSig  bool            `json:"requires_logicsig"`
 	MnemonicWordCount int             `json:"mnemonic_word_count"`
+	MnemonicImport    bool            `json:"mnemonic_import"`
 	MnemonicScheme    string          `json:"mnemonic_scheme"`
 	CreationParams    []CreationParam `json:"creation_params"`
 	RuntimeArgs       []RuntimeArg    `json:"runtime_args"`
@@ -209,12 +210,14 @@ type KeyTypeInfo struct {
 
 // KeyInfo represents a key returned from the /keys endpoint.
 type KeyInfo struct {
-	Address       string       `json:"address"`
-	PublicKeyHex  string       `json:"public_key_hex"`
-	KeyType       string       `json:"key_type"`
-	LsigSize      int          `json:"lsig_size,omitempty"`
-	IsGenericLsig bool         `json:"is_generic_lsig,omitempty"`
-	RuntimeArgs   []RuntimeArg `json:"runtime_args,omitempty"`
+	Address         string       `json:"address"`
+	PublicKeyHex    string       `json:"public_key_hex"`
+	KeyType         string       `json:"key_type"`
+	LsigSize        int          `json:"lsig_size,omitempty"`
+	IsGenericLsig   bool         `json:"is_generic_lsig,omitempty"`
+	RuntimeArgs     []RuntimeArg `json:"runtime_args,omitempty"`
+	TemplateStatus  string       `json:"template_status,omitempty"`
+	TemplateWarning string       `json:"template_warning,omitempty"`
 }
 
 // KeysResponse is the response from the /keys endpoint.

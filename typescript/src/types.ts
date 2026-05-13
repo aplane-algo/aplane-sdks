@@ -28,7 +28,7 @@ export interface KeyInfo {
   address: string;
   /** Public key in hex format */
   publicKeyHex: string;
-  /** Key type (e.g., "ed25519", "falcon1024-v1", "timelock-v1") */
+  /** Key type (e.g., "ed25519", "aplane.falcon1024.v1", "aplane.timelock.v1") */
   keyType: string;
   /** Total LogicSig size for budget calculation (bytecode + crypto sig) */
   lsigSize: number;
@@ -36,6 +36,10 @@ export interface KeyInfo {
   isGenericLsig: boolean;
   /** Runtime arguments for generic LogicSigs */
   runtimeArgs?: RuntimeArg[];
+  /** Template provenance status, when the signer reports one */
+  templateStatus?: string;
+  /** Human-readable template provenance warning */
+  templateWarning?: string;
 }
 
 /**
@@ -126,7 +130,7 @@ export interface CreationParam {
  * Information about an available key type.
  */
 export interface KeyTypeInfo {
-  /** Key type identifier (e.g., "ed25519", "falcon1024-v1") */
+  /** Key type identifier (e.g., "ed25519", "aplane.falcon1024.v1") */
   keyType: string;
   /** Key family (e.g., "ed25519", "falcon") */
   family: string;
@@ -138,6 +142,8 @@ export interface KeyTypeInfo {
   requiresLogicsig?: boolean;
   /** Number of words in the mnemonic */
   mnemonicWordCount?: number;
+  /** Whether mnemonic import is supported for this key type */
+  mnemonicImport?: boolean;
   /** Mnemonic scheme name */
   mnemonicScheme?: string;
   /** Creation parameters */

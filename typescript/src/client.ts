@@ -523,6 +523,8 @@ export class SignerClient {
         lsigSize: raw.lsig_size || 0,
         isGenericLsig: raw.is_generic_lsig || false,
         runtimeArgs,
+        templateStatus: raw.template_status,
+        templateWarning: raw.template_warning,
       };
       keys.push(keyInfo);
       this.keyCache.set(keyInfo.address, keyInfo);
@@ -604,6 +606,7 @@ export class SignerClient {
         description: kt.description,
         requiresLogicsig: kt.requires_logicsig,
         mnemonicWordCount: kt.mnemonic_word_count,
+        mnemonicImport: kt.mnemonic_import,
         mnemonicScheme: kt.mnemonic_scheme,
         creationParams,
         runtimeArgs,
@@ -616,7 +619,7 @@ export class SignerClient {
   /**
    * Generate a new key on the signer.
    *
-   * @param keyType - Type of key to generate (e.g., "ed25519", "falcon1024-v1")
+   * @param keyType - Type of key to generate (e.g., "ed25519", "aplane.falcon1024.v1")
    * @param parameters - Optional creation parameters (type-specific)
    * @returns GenerateResult with address, keyType, and parameters
    */

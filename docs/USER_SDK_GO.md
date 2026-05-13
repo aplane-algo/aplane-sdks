@@ -233,6 +233,8 @@ for _, key := range keys {
 - `LsigSize`
 - `IsGenericLsig`
 - `RuntimeArgs`
+- `TemplateStatus`
+- `TemplateWarning`
 
 ### Get One Key
 
@@ -257,6 +259,7 @@ This is the easiest way to discover:
 - available key families
 - creation parameters for generated keys
 - runtime args required by generic LogicSigs
+- explicit mnemonic import support through `MnemonicImport`
 
 ### Generate And Delete A Key
 

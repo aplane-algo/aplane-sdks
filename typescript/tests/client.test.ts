@@ -129,9 +129,11 @@ describe("SignerClient", () => {
           {
             address: "ADDR2",
             public_key_hex: "def456",
-            key_type: "falcon1024-v1",
+            key_type: "aplane.falcon1024.v1",
             lsig_size: 3035,
             is_generic_lsig: false,
+            template_status: "unavailable",
+            template_warning: "template fingerprint unavailable",
           },
         ],
       };
@@ -150,6 +152,8 @@ describe("SignerClient", () => {
       assert.equal(keys[0].keyType, "ed25519");
       assert.equal(keys[1].address, "ADDR2");
       assert.equal(keys[1].lsigSize, 3035);
+      assert.equal(keys[1].templateStatus, "unavailable");
+      assert.equal(keys[1].templateWarning, "template fingerprint unavailable");
     });
 
     it("throws AuthenticationError on 401", async () => {
@@ -206,12 +210,14 @@ describe("SignerClient", () => {
             display_name: "Ed25519",
             description: "Standard Ed25519 key",
             requires_logicsig: false,
+            mnemonic_import: true,
           },
           {
-            key_type: "falcon1024-v1",
+            key_type: "aplane.falcon1024.v1",
             family: "falcon",
             display_name: "Falcon-1024",
             requires_logicsig: true,
+            mnemonic_import: true,
             creation_params: [
               { name: "network", label: "Network", type: "string", required: true },
               {
@@ -238,7 +244,9 @@ describe("SignerClient", () => {
       assert.equal(types[0].keyType, "ed25519");
       assert.equal(types[0].family, "ed25519");
       assert.equal(types[0].requiresLogicsig, false);
-      assert.equal(types[1].keyType, "falcon1024-v1");
+      assert.equal(types[0].mnemonicImport, true);
+      assert.equal(types[1].keyType, "aplane.falcon1024.v1");
+      assert.equal(types[1].mnemonicImport, true);
       assert.equal(types[1].creationParams!.length, 2);
       assert.equal(types[1].creationParams![0].name, "network");
       assert.equal(types[1].creationParams![0].required, true);
@@ -276,13 +284,13 @@ describe("SignerClient", () => {
         ok: true,
         json: async () => ({
           address: "NEWADDR456",
-          key_type: "falcon1024-v1",
+          key_type: "aplane.falcon1024.v1",
           parameters: { network: "testnet" },
         }),
       });
 
       const client = new SignerClient("http://localhost:11270", "test-token");
-      const result = await client.generateKey("falcon1024-v1", { network: "testnet" });
+      const result = await client.generateKey("aplane.falcon1024.v1", { network: "testnet" });
 
       assert.equal(result.address, "NEWADDR456");
       assert.deepEqual(result.parameters, { network: "testnet" });
@@ -290,7 +298,7 @@ describe("SignerClient", () => {
       // Verify request body
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
-      assert.equal(body.key_type, "falcon1024-v1");
+      assert.equal(body.key_type, "aplane.falcon1024.v1");
       assert.deepEqual(body.parameters, { network: "testnet" });
     });
 

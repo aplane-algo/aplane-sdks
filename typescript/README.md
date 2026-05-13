@@ -177,7 +177,7 @@ for (const key of keys) {
 
 Returns list of `KeyInfo`:
 - `address`: Algorand address
-- `keyType`: "ed25519", "falcon1024-v1", "timelock-v1", etc.
+- `keyType`: "ed25519", "aplane.falcon1024.v1", "aplane.timelock.v1", etc.
 - `lsigSize`: LogicSig size (for budget calculation)
 - `isGenericLsig`: True if no cryptographic signature needed
 - `runtimeArgs`: List of `RuntimeArg` for generic LogicSigs
@@ -249,9 +249,9 @@ const signedList = await client.signTransactionsList([txn1, txn2]);
 | Key Type | Description | Notes |
 |----------|-------------|-------|
 | `ed25519` | Native Algorand keys | Standard signing |
-| `falcon1024-v*` | Post-quantum LogicSig | Signature in LogicSig.Args[0] |
-| `timelock-v*` | Time-locked funds | No signature, TEAL-only |
-| `htlc-v*` | Hash-locked funds | Requires `preimage` arg (check `runtimeArgs`) |
+| `aplane.falcon1024.v1` | Post-quantum LogicSig | Signature in LogicSig.Args[0] |
+| `aplane.timelock.v1` | Time-locked funds | No signature, TEAL-only |
+| `aplane.htlc.v*` | Hash-locked funds | Requires `preimage` arg (check `runtimeArgs`) |
 
 The server assembles the complete signed transaction - the SDK returns a base64 string ready for submission.
 

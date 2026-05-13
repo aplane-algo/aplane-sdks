@@ -170,6 +170,8 @@ class KeyInfo:
     lsig_size: int = 0
     is_generic_lsig: bool = False
     runtime_args: Optional[List[RuntimeArg]] = None  # Args required for generic LogicSigs
+    template_status: str = ""
+    template_warning: str = ""
 
 
 @dataclass
@@ -216,6 +218,7 @@ class KeyTypeInfo:
     description: str = ""
     requires_logicsig: bool = False
     mnemonic_word_count: int = 0
+    mnemonic_import: bool = False
     mnemonic_scheme: str = ""
     creation_params: Optional[List[CreationParam]] = None
     runtime_args: Optional[List[RuntimeArg]] = None
@@ -781,7 +784,9 @@ class SignerClient:
                 public_key_hex=k.get("public_key_hex", ""),
                 lsig_size=k.get("lsig_size", 0),
                 is_generic_lsig=k.get("is_generic_lsig", False),
-                runtime_args=runtime_args
+                runtime_args=runtime_args,
+                template_status=k.get("template_status", ""),
+                template_warning=k.get("template_warning", ""),
             )
             keys.append(key_info)
             self._key_cache[key_info.address] = key_info
@@ -868,6 +873,7 @@ class SignerClient:
                 description=kt.get("description", ""),
                 requires_logicsig=kt.get("requires_logicsig", False),
                 mnemonic_word_count=kt.get("mnemonic_word_count", 0),
+                mnemonic_import=kt.get("mnemonic_import", False),
                 mnemonic_scheme=kt.get("mnemonic_scheme", ""),
                 creation_params=creation_params,
                 runtime_args=runtime_args,
@@ -884,7 +890,7 @@ class SignerClient:
         Generate a new key on the signer.
 
         Args:
-            key_type: Type of key to generate (e.g., "ed25519", "falcon-1024")
+            key_type: Type of key to generate (e.g., "ed25519", "aplane.falcon1024.v1")
             parameters: Optional creation parameters (type-specific)
 
         Returns:

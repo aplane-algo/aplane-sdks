@@ -357,8 +357,8 @@ func TestListKeyTypes_Success(t *testing.T) {
 	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(keyTypesResponse{
 			KeyTypes: []KeyTypeInfo{
-				{KeyType: "ed25519", DisplayName: "Ed25519", MnemonicWordCount: 25},
-				{KeyType: "falcon1024-v1", DisplayName: "Falcon-1024", RequiresLogicSig: true},
+				{KeyType: "ed25519", DisplayName: "Ed25519", MnemonicWordCount: 25, MnemonicImport: true},
+				{KeyType: "aplane.falcon1024.v1", DisplayName: "Falcon-1024", RequiresLogicSig: true, MnemonicImport: true},
 			},
 		})
 	})
@@ -376,6 +376,9 @@ func TestListKeyTypes_Success(t *testing.T) {
 	}
 	if !kts[1].RequiresLogicSig {
 		t.Fatal("expected falcon to require logicsig")
+	}
+	if !kts[1].MnemonicImport {
+		t.Fatal("expected falcon to allow mnemonic import")
 	}
 }
 

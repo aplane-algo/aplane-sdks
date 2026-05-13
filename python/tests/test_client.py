@@ -81,7 +81,13 @@ class TestListKeys:
             "count": 2,
             "keys": [
                 {"address": "ADDR1", "key_type": "ed25519", "public_key_hex": "abcd", "lsig_size": 0},
-                {"address": "ADDR2", "key_type": "falcon1024-v1", "lsig_size": 3035},
+                {
+                    "address": "ADDR2",
+                    "key_type": "aplane.falcon1024.v1",
+                    "lsig_size": 3035,
+                    "template_status": "unavailable",
+                    "template_warning": "template fingerprint unavailable",
+                },
             ],
         })
         with patch.object(client.session, "get", return_value=resp):
@@ -92,6 +98,8 @@ class TestListKeys:
         assert keys[0].key_type == "ed25519"
         assert keys[0].public_key_hex == "abcd"
         assert keys[1].lsig_size == 3035
+        assert keys[1].template_status == "unavailable"
+        assert keys[1].template_warning == "template fingerprint unavailable"
 
     def test_auth_error(self):
         client = make_client()
@@ -158,11 +166,13 @@ class TestListKeyTypes:
                     "family": "ed25519",
                     "display_name": "Ed25519",
                     "requires_logicsig": False,
+                    "mnemonic_import": True,
                 },
                 {
-                    "key_type": "falcon1024-v1",
+                    "key_type": "aplane.falcon1024.v1",
                     "family": "falcon",
                     "requires_logicsig": True,
+                    "mnemonic_import": True,
                     "creation_params": [
                         {"name": "network", "label": "Network", "type": "string", "required": True},
                         {
@@ -181,7 +191,9 @@ class TestListKeyTypes:
         assert len(types) == 2
         assert types[0].key_type == "ed25519"
         assert types[0].family == "ed25519"
-        assert types[1].key_type == "falcon1024-v1"
+        assert types[0].mnemonic_import is True
+        assert types[1].key_type == "aplane.falcon1024.v1"
+        assert types[1].mnemonic_import is True
         assert types[1].creation_params is not None
         assert len(types[1].creation_params) == 2
         assert types[1].creation_params[0].name == "network"
@@ -221,11 +233,11 @@ class TestGenerateKey:
         client = make_client()
         resp = mock_response(200, {
             "address": "NEWADDR456",
-            "key_type": "falcon1024-v1",
+            "key_type": "aplane.falcon1024.v1",
             "parameters": {"network": "testnet"},
         })
         with patch.object(client.session, "post", return_value=resp) as mock_post:
-            result = client.generate_key("falcon1024-v1", {"network": "testnet"})
+            result = client.generate_key("aplane.falcon1024.v1", {"network": "testnet"})
 
         assert result.address == "NEWADDR456"
         assert result.parameters == {"network": "testnet"}
@@ -233,7 +245,7 @@ class TestGenerateKey:
         # Verify request body
         call_kwargs = mock_post.call_args
         body = call_kwargs[1]["json"] if "json" in call_kwargs[1] else json.loads(call_kwargs[1].get("data", "{}"))
-        assert body["key_type"] == "falcon1024-v1"
+        assert body["key_type"] == "aplane.falcon1024.v1"
 
     def test_auth_error(self):
         client = make_client()

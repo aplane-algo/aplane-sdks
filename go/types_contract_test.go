@@ -109,6 +109,52 @@ func TestGoSDKContractFixturesRoundTrip(t *testing.T) {
 	}
 }
 
+func TestGoSDKContractKeyTypeMetadata(t *testing.T) {
+	raw, err := os.ReadFile(sdkContractFixturePath(t, "keytypes_response_full.json"))
+	if err != nil {
+		t.Fatalf("read keytypes fixture: %v", err)
+	}
+	var resp KeyTypesResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		t.Fatalf("unmarshal keytypes fixture: %v", err)
+	}
+	if len(resp.KeyTypes) != 2 {
+		t.Fatalf("KeyTypes length = %d, want 2", len(resp.KeyTypes))
+	}
+	if !resp.KeyTypes[0].MnemonicImport {
+		t.Fatal("ed25519 fixture should allow mnemonic import")
+	}
+	if resp.KeyTypes[1].KeyType != "aplane.timelock.v1" {
+		t.Fatalf("generic key type = %q, want aplane.timelock.v1", resp.KeyTypes[1].KeyType)
+	}
+	if resp.KeyTypes[1].MnemonicImport {
+		t.Fatal("generic template fixture should not allow mnemonic import")
+	}
+}
+
+func TestGoSDKMapsTemplateWarningFields(t *testing.T) {
+	raw := []byte(`{
+		"count": 1,
+		"keys": [{
+			"address": "ADDR1",
+			"public_key_hex": "abcd",
+			"key_type": "aplane.timelock.v1",
+			"template_status": "conflict",
+			"template_warning": "template fingerprint differs"
+		}]
+	}`)
+	var resp KeysResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		t.Fatalf("unmarshal keys response: %v", err)
+	}
+	if got := resp.Keys[0].TemplateStatus; got != "conflict" {
+		t.Fatalf("TemplateStatus = %q, want conflict", got)
+	}
+	if got := resp.Keys[0].TemplateWarning; got != "template fingerprint differs" {
+		t.Fatalf("TemplateWarning = %q, want template fingerprint differs", got)
+	}
+}
+
 func TestGoSDKContractFixtureManifest(t *testing.T) {
 	if got := committedSDKContractFixtureNames(t); !reflect.DeepEqual(got, expectedSDKContractFixtureNames) {
 		t.Fatalf("contract fixture manifest mismatch\nwant: %#v\n got: %#v", expectedSDKContractFixtureNames, got)

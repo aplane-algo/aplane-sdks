@@ -91,7 +91,7 @@ def test_list_keys_maps_generic_lsig_metadata():
     assert len(keys) == 2
     generic = keys[1]
     assert generic.public_key_hex == "ffeeddccbbaa99887766554433221100"
-    assert generic.key_type == "timelock-v1"
+    assert generic.key_type == "aplane.timelock.v1"
     assert generic.lsig_size == 512
     assert generic.is_generic_lsig is True
     assert generic.runtime_args is not None
@@ -109,9 +109,10 @@ def test_list_key_types_maps_creation_and_runtime_metadata():
         key_types = client.list_key_types()
 
     timelock = key_types[1]
-    assert timelock.key_type == "timelock-v1"
+    assert timelock.key_type == "aplane.timelock.v1"
     assert timelock.display_name == "Timelock"
     assert timelock.requires_logicsig is True
+    assert timelock.mnemonic_import is False
     assert timelock.creation_params is not None
     assert timelock.creation_params[1].param_type == "address[]"
     assert timelock.creation_params[1].min_items == 1
@@ -123,6 +124,28 @@ def test_list_key_types_maps_creation_and_runtime_metadata():
     assert timelock.runtime_args[0].label == "Preimage"
     assert timelock.runtime_args[0].required is True
     assert timelock.runtime_args[0].byte_length == 32
+
+
+def test_list_keys_maps_template_warning_fields():
+    client = make_client()
+    resp = mock_response(200, {
+        "count": 1,
+        "keys": [
+            {
+                "address": "ADDR1",
+                "public_key_hex": "abcd",
+                "key_type": "aplane.timelock.v1",
+                "template_status": "conflict",
+                "template_warning": "template fingerprint differs",
+            }
+        ],
+    })
+
+    with patch.object(client.session, "get", return_value=resp):
+        keys = client.list_keys(refresh=True)
+
+    assert keys[0].template_status == "conflict"
+    assert keys[0].template_warning == "template fingerprint differs"
 
 
 def test_plan_group_returns_wire_mutation_report():
@@ -153,9 +176,9 @@ def test_generate_key_maps_admin_generate_response():
     resp = mock_response(200, fixture("admin_generate_response_generic.json"))
 
     with patch.object(client.session, "post", return_value=resp):
-        generated = client.generate_key("timelock-v1", {"unlock_round": "123456"})
+        generated = client.generate_key("aplane.timelock.v1", {"unlock_round": "123456"})
 
     assert generated.address == "GENERATEDADDR0000000000000000000000000000000000000000000"
-    assert generated.key_type == "timelock-v1"
+    assert generated.key_type == "aplane.timelock.v1"
     assert generated.parameters is not None
     assert generated.parameters["unlock_round"] == "123456"
