@@ -216,14 +216,14 @@ healthy, err := client.Health()
 ### Identity Status
 
 ```go
-identity, err := client.GetIdentity()
+identity, err := client.GetStatus()
 if err != nil {
 	return err
 }
 fmt.Println(identity.State, identity.KeysetRevision, identity.ApprovalWaitSeconds)
 ```
 
-`GetIdentity(...)` calls authenticated `/identity`. It does not require the
+`GetStatus(...)` calls authenticated `/status`. It does not require the
 signer to be unlocked; a locked signer is returned as status data. Use
 `KeysetRevision` as a process-local signal to refresh `/keys` only when the
 loaded keyset changes. Do not treat it as a durable version across apsigner

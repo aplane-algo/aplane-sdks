@@ -287,17 +287,17 @@ func TestHealth_NetworkError(t *testing.T) {
 	}
 }
 
-// --- GetIdentity tests ---
+// --- GetStatus tests ---
 
-func TestGetIdentity_Success(t *testing.T) {
+func TestGetStatus_Success(t *testing.T) {
 	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/identity" {
-			t.Fatalf("request = %s %s, want GET /identity", r.Method, r.URL.Path)
+		if r.Method != http.MethodGet || r.URL.Path != "/status" {
+			t.Fatalf("request = %s %s, want GET /status", r.Method, r.URL.Path)
 		}
 		if got := r.Header.Get("Authorization"); got != "aplane test-token" {
 			t.Fatalf("Authorization = %q, want aplane test-token", got)
 		}
-		json.NewEncoder(w).Encode(IdentityResponse{
+		json.NewEncoder(w).Encode(StatusResponse{
 			IdentityID:          "default",
 			State:               "unlocked",
 			ReadyForSigning:     true,
@@ -308,7 +308,7 @@ func TestGetIdentity_Success(t *testing.T) {
 	})
 	defer server.Close()
 
-	identity, err := client.GetIdentity()
+	identity, err := client.GetStatus()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -323,9 +323,9 @@ func TestGetIdentity_Success(t *testing.T) {
 	}
 }
 
-func TestGetIdentity_LockedStateIsSuccess(t *testing.T) {
+func TestGetStatus_LockedStateIsSuccess(t *testing.T) {
 	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(IdentityResponse{
+		json.NewEncoder(w).Encode(StatusResponse{
 			IdentityID:      "default",
 			State:           "locked",
 			SignerLocked:    true,
@@ -336,7 +336,7 @@ func TestGetIdentity_LockedStateIsSuccess(t *testing.T) {
 	})
 	defer server.Close()
 
-	identity, err := client.GetIdentity()
+	identity, err := client.GetStatus()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -345,13 +345,13 @@ func TestGetIdentity_LockedStateIsSuccess(t *testing.T) {
 	}
 }
 
-func TestGetIdentity_AuthError(t *testing.T) {
+func TestGetStatus_AuthError(t *testing.T) {
 	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 	})
 	defer server.Close()
 
-	_, err := client.GetIdentity()
+	_, err := client.GetStatus()
 	if err != ErrAuthentication {
 		t.Fatalf("expected ErrAuthentication, got: %v", err)
 	}
@@ -380,8 +380,8 @@ func TestSignRequestsDiscoversApprovalWaitBeforeSigning(t *testing.T) {
 	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.URL.Path)
 		switch r.URL.Path {
-		case "/identity":
-			json.NewEncoder(w).Encode(IdentityResponse{
+		case "/status":
+			json.NewEncoder(w).Encode(StatusResponse{
 				IdentityID:          "default",
 				State:               "unlocked",
 				ApprovalWaitSeconds: 60,
@@ -400,17 +400,17 @@ func TestSignRequestsDiscoversApprovalWaitBeforeSigning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got := strings.Join(paths, ","); got != "/identity,/sign" {
-		t.Fatalf("paths = %s, want /identity,/sign", got)
+	if got := strings.Join(paths, ","); got != "/status,/sign" {
+		t.Fatalf("paths = %s, want /status,/sign", got)
 	}
 }
 
-func TestSignRequestsIdentityFailureFallsBackToSign(t *testing.T) {
+func TestSignRequestsStatusFailureFallsBackToSign(t *testing.T) {
 	var paths []string
 	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.URL.Path)
 		switch r.URL.Path {
-		case "/identity":
+		case "/status":
 			w.WriteHeader(http.StatusServiceUnavailable)
 		case "/sign":
 			json.NewEncoder(w).Encode(GroupSignResponse{Signed: []string{"deadbeef"}})
@@ -426,8 +426,8 @@ func TestSignRequestsIdentityFailureFallsBackToSign(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got := strings.Join(paths, ","); got != "/identity,/sign" {
-		t.Fatalf("paths = %s, want /identity,/sign", got)
+	if got := strings.Join(paths, ","); got != "/status,/sign" {
+		t.Fatalf("paths = %s, want /status,/sign", got)
 	}
 }
 

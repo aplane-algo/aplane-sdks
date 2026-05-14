@@ -23,9 +23,9 @@ var expectedSDKContractFixtureNames = []string{
 	"group_sign_request_mixed.json",
 	"group_sign_response_mutated.json",
 	"health_response_ready.json",
-	"identity_response_ready.json",
 	"keys_response_generic.json",
 	"keytypes_response_full.json",
+	"status_response_ready.json",
 }
 
 func sdkContractFixturePath(t *testing.T, name string) string {
@@ -101,7 +101,7 @@ func TestGoSDKContractFixturesRoundTrip(t *testing.T) {
 		{"admin_generate_request_generic.json", assertSDKContractRoundTrip[generateRequest]},
 		{"admin_generate_response_generic.json", assertSDKContractRoundTrip[GenerateResult]},
 		{"health_response_ready.json", assertSDKContractRoundTrip[HealthResponse]},
-		{"identity_response_ready.json", assertSDKContractRoundTrip[IdentityResponse]},
+		{"status_response_ready.json", assertSDKContractRoundTrip[StatusResponse]},
 	}
 
 	for _, tt := range tests {
@@ -111,14 +111,14 @@ func TestGoSDKContractFixturesRoundTrip(t *testing.T) {
 	}
 }
 
-func TestGoSDKContractIdentityMetadata(t *testing.T) {
-	raw, err := os.ReadFile(sdkContractFixturePath(t, "identity_response_ready.json"))
+func TestGoSDKContractStatusMetadata(t *testing.T) {
+	raw, err := os.ReadFile(sdkContractFixturePath(t, "status_response_ready.json"))
 	if err != nil {
-		t.Fatalf("read identity fixture: %v", err)
+		t.Fatalf("read status fixture: %v", err)
 	}
-	var resp IdentityResponse
+	var resp StatusResponse
 	if err := json.Unmarshal(raw, &resp); err != nil {
-		t.Fatalf("unmarshal identity fixture: %v", err)
+		t.Fatalf("unmarshal status fixture: %v", err)
 	}
 	if resp.IdentityID != "default" {
 		t.Fatalf("IdentityID = %q, want default", resp.IdentityID)

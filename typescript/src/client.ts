@@ -14,7 +14,7 @@ import type {
   LsigArgsMap,
   SignRequest,
   GroupSignResponse,
-  IdentityResponse,
+  StatusResponse,
   KeysResponse,
   KeyTypesResponse,
   KeyTypeInfo,
@@ -48,7 +48,7 @@ import {
 } from "./config.js";
 
 const HEALTH_TIMEOUT = 3000;
-const IDENTITY_TIMEOUT = 5000;
+const STATUS_TIMEOUT = 5000;
 const INVENTORY_TIMEOUT = 30000;
 const MUTATION_TIMEOUT = 60000;
 const GROUP_PLAN_TIMEOUT = 60000;
@@ -484,15 +484,15 @@ export class SignerClient {
   }
 
   /**
-   * Fetch authenticated identity status and keyset revision.
+   * Fetch authenticated signer status and keyset revision.
    *
-   * /identity is authenticated but does not require the signer to be unlocked.
+   * /status is authenticated but does not require the signer to be unlocked.
    * A locked state in a 200 response is returned as normal data.
    */
-  async getIdentity(): Promise<IdentityResponse> {
-    const response = await this.fetch("/identity", {
+  async getStatus(): Promise<StatusResponse> {
+    const response = await this.fetch("/status", {
       method: "GET",
-      timeout: this.timeoutFor(IDENTITY_TIMEOUT),
+      timeout: this.timeoutFor(STATUS_TIMEOUT),
     });
 
     if (response.status === 401) {
@@ -502,11 +502,11 @@ export class SignerClient {
       throw new SignerUnavailableError("Signer unavailable");
     }
     if (response.status !== 200) {
-      throw new SignerError(`Failed to get identity status: HTTP ${response.status}`);
+      throw new SignerError(`Failed to get signer status: HTTP ${response.status}`);
     }
 
     const data = (await response.json()) as Record<string, unknown>;
-    const identity: IdentityResponse = {
+    const identity: StatusResponse = {
       identityId: String(data.identity_id || ""),
       state: String(data.state || ""),
       signerLocked: Boolean(data.signer_locked),
@@ -551,9 +551,9 @@ export class SignerClient {
       return;
     }
     try {
-      await this.getIdentity();
+      await this.getStatus();
     } catch {
-      // /identity discovery failure must not fail /sign; use fallback timeout.
+      // /status discovery failure must not fail /sign; use fallback timeout.
     }
   }
 

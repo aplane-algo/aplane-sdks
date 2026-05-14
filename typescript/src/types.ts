@@ -153,9 +153,9 @@ export interface KeyTypeInfo {
 }
 
 /**
- * Response from the /identity endpoint.
+ * Response from the /status endpoint.
  */
-export interface IdentityResponse {
+export interface StatusResponse {
   /** Authenticated identity ID resolved from the signer token */
   identityId: string;
   /** Current lock state: "locked", "unlocked", or "unknown" */

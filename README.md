@@ -92,7 +92,7 @@ Optional variables:
 - `APLANE_SDK_KEY_TYPE`: key type to generate and sign with, defaults to `ed25519`
 
 Each SDK test mirrors a basic `apshell` signer-facing workflow: health,
-identity status, key type discovery, key generation, key inventory refresh,
+signer status, key type discovery, key generation, key inventory refresh,
 offline signing of a 0-ALGO self-payment, key deletion, and keyset revision
 checks.
 

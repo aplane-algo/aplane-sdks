@@ -163,8 +163,8 @@ type HealthResponse struct {
 	IPCEnabled      bool   `json:"ipc_enabled"`
 }
 
-// IdentityResponse is the response from the /identity endpoint.
-type IdentityResponse struct {
+// StatusResponse is the response from the /status endpoint.
+type StatusResponse struct {
 	IdentityID          string `json:"identity_id"`
 	State               string `json:"state"`
 	SignerLocked        bool   `json:"signer_locked"`

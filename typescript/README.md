@@ -164,12 +164,12 @@ if (await client.health()) {
 }
 ```
 
-#### `getIdentity(): Promise<IdentityResponse>`
+#### `getStatus(): Promise<StatusResponse>`
 
-Fetch authenticated identity status. This works while the signer is locked.
+Fetch authenticated signer status. This works while the signer is locked.
 
 ```typescript
-const identity = await client.getIdentity();
+const identity = await client.getStatus();
 console.log(identity.state, identity.keysetRevision);
 ```
 
@@ -257,7 +257,7 @@ const signedList = await client.signTransactionsList([txn1, txn2]);
 // signedList is string[], each element is a base64-encoded signed transaction
 ```
 
-Signing calls discover `/identity.approval_wait_seconds` and use that value
+Signing calls discover `/status.approval_wait_seconds` and use that value
 plus 30 seconds of slack for the request timeout. If discovery fails or an older
 signer omits the field, signing falls back to 6 minutes. An explicit shorter
 timeout still wins and cancels queued/pending manual approval.

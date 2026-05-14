@@ -147,12 +147,12 @@ if client.health():
     print("Signer is online")
 ```
 
-#### `get_identity() -> IdentityResponse`
+#### `get_status() -> StatusResponse`
 
-Fetch authenticated identity status. This works while the signer is locked.
+Fetch authenticated signer status. This works while the signer is locked.
 
 ```python
-identity = client.get_identity()
+identity = client.get_status()
 print(identity.state, identity.keyset_revision)
 ```
 
@@ -237,7 +237,7 @@ signed_list = client.sign_transactions_list([txn1, txn2])
 # signed_list is List[str], each element is a base64-encoded signed transaction
 ```
 
-Signing calls discover `/identity.approval_wait_seconds` and use that value
+Signing calls discover `/status.approval_wait_seconds` and use that value
 plus 30 seconds of slack for the request timeout. If discovery fails or an older
 signer omits the field, signing falls back to 6 minutes. An explicit shorter
 timeout still wins and cancels queued/pending manual approval.

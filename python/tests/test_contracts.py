@@ -8,7 +8,7 @@ import base64
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from aplane.signer import SignerClient, IdentityResponse
+from aplane.signer import SignerClient, StatusResponse
 
 
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "contracts" / "signerapi"
@@ -21,9 +21,9 @@ EXPECTED_FIXTURE_NAMES = [
     "group_sign_request_mixed.json",
     "group_sign_response_mutated.json",
     "health_response_ready.json",
-    "identity_response_ready.json",
     "keys_response_generic.json",
     "keytypes_response_full.json",
+    "status_response_ready.json",
 ]
 
 
@@ -127,9 +127,9 @@ def test_list_key_types_maps_creation_and_runtime_metadata():
     assert timelock.runtime_args[0].byte_length == 32
 
 
-def test_identity_fixture_maps_metadata():
-    data = fixture("identity_response_ready.json")
-    identity = IdentityResponse(**data)
+def test_status_fixture_maps_metadata():
+    data = fixture("status_response_ready.json")
+    identity = StatusResponse(**data)
 
     assert identity.identity_id == "default"
     assert identity.state == "unlocked"

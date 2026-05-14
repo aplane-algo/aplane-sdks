@@ -77,7 +77,7 @@ def test_live_signer_client_workflow():
     try:
         assert client.health() is True
 
-        before = client.get_identity()
+        before = client.get_status()
         assert before.ready_for_signing is True
         assert before.signer_locked is False
 
@@ -131,7 +131,7 @@ def _wait_for_keyset_revision(client: SignerClient, previous: int, action: str):
     last_error = None
     while time.time() < deadline:
         try:
-            last = client.get_identity()
+            last = client.get_status()
             if last.keyset_revision > previous:
                 return last
         except Exception as exc:

@@ -65,7 +65,7 @@ const originalFetch = globalThis.fetch;
 const mockFetch = createMockFetch();
 globalThis.fetch = mockFetch as any;
 
-function queueIdentityResponse(approvalWaitSeconds: number = 60): void {
+function queueStatusResponse(approvalWaitSeconds: number = 60): void {
   mockFetch.mockResolvedValueOnce({
     status: 200,
     ok: true,
@@ -130,8 +130,8 @@ describe("SignerClient", () => {
     });
   });
 
-  describe("getIdentity", () => {
-    it("returns authenticated identity status", async () => {
+  describe("getStatus", () => {
+    it("returns authenticated signer status", async () => {
       mockFetch.mockResolvedValueOnce({
         status: 200,
         ok: true,
@@ -147,16 +147,16 @@ describe("SignerClient", () => {
       });
 
       const client = new SignerClient("http://localhost:11270", "test-token");
-      const identity = await client.getIdentity();
+      const identity = await client.getStatus();
 
       assert.equal(identity.identityId, "default");
       assert.equal(identity.keysetRevision, 4);
       assert.equal(identity.approvalWaitSeconds, 60);
-      assert.equal(mockFetch.mock.calls[0][0], "http://localhost:11270/identity");
+      assert.equal(mockFetch.mock.calls[0][0], "http://localhost:11270/status");
       assert.equal(mockFetch.mock.calls[0][1].method, "GET");
     });
 
-    it("returns locked state as successful identity data", async () => {
+    it("returns locked state as successful status data", async () => {
       mockFetch.mockResolvedValueOnce({
         status: 200,
         ok: true,
@@ -171,7 +171,7 @@ describe("SignerClient", () => {
       });
 
       const client = new SignerClient("http://localhost:11270", "test-token");
-      const identity = await client.getIdentity();
+      const identity = await client.getStatus();
 
       assert.equal(identity.state, "locked");
       assert.equal(identity.signerLocked, true);
@@ -185,7 +185,7 @@ describe("SignerClient", () => {
       });
 
       const client = new SignerClient("http://localhost:11270", "test-token");
-      await assert.rejects(client.getIdentity(), AuthenticationError);
+      await assert.rejects(client.getStatus(), AuthenticationError);
     });
   });
 
@@ -506,7 +506,7 @@ describe("SignerClient", () => {
     });
 
     it("throws AuthenticationError on 401", async () => {
-      queueIdentityResponse();
+      queueStatusResponse();
       mockFetch.mockResolvedValueOnce({
         status: 401,
         ok: false,
@@ -519,7 +519,7 @@ describe("SignerClient", () => {
     });
 
     it("throws SigningRejectedError on 403", async () => {
-      queueIdentityResponse();
+      queueStatusResponse();
       mockFetch.mockResolvedValueOnce({
         status: 403,
         ok: false,
@@ -533,7 +533,7 @@ describe("SignerClient", () => {
     });
 
     it("throws SignerUnavailableError on 503", async () => {
-      queueIdentityResponse();
+      queueStatusResponse();
       mockFetch.mockResolvedValueOnce({
         status: 503,
         ok: false,
@@ -547,7 +547,7 @@ describe("SignerClient", () => {
     });
 
     it("throws KeyNotFoundError on 400 with 'not found'", async () => {
-      queueIdentityResponse();
+      queueStatusResponse();
       mockFetch.mockResolvedValueOnce({
         status: 400,
         ok: false,
@@ -564,7 +564,7 @@ describe("SignerClient", () => {
     it("throws SignerUnavailableError on timeout", async () => {
       const abortError = new Error("Abort");
       abortError.name = "AbortError";
-      queueIdentityResponse();
+      queueStatusResponse();
       mockFetch.mockRejectedValueOnce(abortError);
 
       const client = new SignerClient("http://localhost:11270", "test-token", 100);
@@ -574,7 +574,7 @@ describe("SignerClient", () => {
       assert.equal(mockFetch.mock.calls.length, 2);
     });
 
-    it("continues signing with fallback timeout when identity discovery fails", async () => {
+    it("continues signing with fallback timeout when status discovery fails", async () => {
       mockFetch.mockResolvedValueOnce({
         status: 503,
         ok: false,
@@ -592,24 +592,24 @@ describe("SignerClient", () => {
       const signed = await client.signTransaction(mockTxn);
 
       assert.equal(Buffer.from(signed, "base64").toString("hex"), "deadbeef");
-      assert.equal(mockFetch.mock.calls[0][0], "http://localhost:11270/identity");
+      assert.equal(mockFetch.mock.calls[0][0], "http://localhost:11270/status");
       assert.equal(mockFetch.mock.calls[1][0], "http://localhost:11270/sign");
     });
 
     it("uses discovered approval wait plus slack for signing timeout", async () => {
-      queueIdentityResponse(120);
+      queueStatusResponse(120);
 
       const client = new SignerClient("http://localhost:11270", "test-token");
-      await client.getIdentity();
+      await client.getStatus();
 
       assert.equal((client as any).signRequestTimeout(), 150000);
     });
 
     it("falls back for invalid discovered approval wait", async () => {
-      queueIdentityResponse(31 * 60);
+      queueStatusResponse(31 * 60);
 
       const client = new SignerClient("http://localhost:11270", "test-token");
-      await client.getIdentity();
+      await client.getStatus();
 
       assert.equal((client as any).signRequestTimeout(), 360000);
     });
@@ -745,7 +745,7 @@ describe("buildSignRequests", () => {
   });
 
   it("builds request with auth address", async () => {
-    queueIdentityResponse();
+    queueStatusResponse();
     mockFetch.mockResolvedValueOnce({
       status: 200,
       ok: true,
@@ -763,7 +763,7 @@ describe("buildSignRequests", () => {
   });
 
   it("defaults auth address to sender", async () => {
-    queueIdentityResponse();
+    queueStatusResponse();
     mockFetch.mockResolvedValueOnce({
       status: 200,
       ok: true,
@@ -779,7 +779,7 @@ describe("buildSignRequests", () => {
   });
 
   it("includes lsig args as hex", async () => {
-    queueIdentityResponse();
+    queueStatusResponse();
     mockFetch.mockResolvedValueOnce({
       status: 200,
       ok: true,
@@ -874,7 +874,7 @@ describe("sign return format", () => {
     const hex1 = Buffer.from("signed-txn-1").toString("hex");
     const hex2 = Buffer.from("signed-txn-2").toString("hex");
 
-    queueIdentityResponse();
+    queueStatusResponse();
     mockFetch.mockResolvedValueOnce({
       status: 200,
       ok: true,
@@ -894,7 +894,7 @@ describe("sign return format", () => {
     const hex1 = Buffer.from("signed-txn-1").toString("hex");
     const hex2 = Buffer.from("signed-txn-2").toString("hex");
 
-    queueIdentityResponse();
+    queueStatusResponse();
     mockFetch.mockResolvedValueOnce({
       status: 200,
       ok: true,

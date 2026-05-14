@@ -252,11 +252,11 @@ const healthy = await client.health();
 ### Identity Status
 
 ```ts
-const identity = await client.getIdentity();
+const identity = await client.getStatus();
 console.log(identity.state, identity.keysetRevision, identity.approvalWaitSeconds);
 ```
 
-`getIdentity()` calls authenticated `/identity`. It does not require unlock; a
+`getStatus()` calls authenticated `/status`. It does not require unlock; a
 locked signer is returned as status data. Use `keysetRevision` as a
 process-local signal to refresh `listKeys(true)` only when the loaded keyset
 changes. Do not treat it as durable across apsigner restarts.

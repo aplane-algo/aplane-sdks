@@ -50,9 +50,9 @@ const expectedFixtureNames = [
   "group_sign_request_mixed.json",
   "group_sign_response_mutated.json",
   "health_response_ready.json",
-  "identity_response_ready.json",
   "keys_response_generic.json",
   "keytypes_response_full.json",
+  "status_response_ready.json",
 ];
 
 function fixture(name: string): any {
@@ -160,15 +160,15 @@ describe("signer API contract fixtures", () => {
     assert.equal(timelock.runtimeArgs?.[0].byteLength, 32);
   });
 
-  it("maps /identity wire fields to public IdentityResponse fields", async () => {
+  it("maps /status wire fields to public StatusResponse fields", async () => {
     mockFetch.mockResolvedValueOnce({
       status: 200,
       ok: true,
-      json: async () => fixture("identity_response_ready.json"),
+      json: async () => fixture("status_response_ready.json"),
     });
 
     const client = new SignerClient("http://localhost:11270", "test-token");
-    const identity = await client.getIdentity();
+    const identity = await client.getStatus();
 
     assert.equal(identity.identityId, "default");
     assert.equal(identity.state, "unlocked");

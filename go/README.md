@@ -178,13 +178,13 @@ Check if signer is reachable.
 healthy, err := client.Health()
 ```
 
-#### `GetIdentity() (*IdentityResponse, error)`
+#### `GetStatus() (*StatusResponse, error)`
 
-Fetch authenticated identity status. This endpoint works while the signer is
+Fetch authenticated signer status. This endpoint works while the signer is
 locked and exposes `KeysetRevision` plus `ApprovalWaitSeconds`.
 
 ```go
-identity, err := client.GetIdentity()
+identity, err := client.GetStatus()
 if err != nil {
 	log.Fatal(err)
 }
@@ -274,7 +274,7 @@ signResp, err := client.SignRequestsWithContext(ctx, []aplane.SignRequest{
 })
 ```
 
-Signing requests discover `/identity.approval_wait_seconds` and use that value
+Signing requests discover `/status.approval_wait_seconds` and use that value
 plus 30 seconds of slack for the HTTP deadline. If discovery fails or an older
 signer omits the field, the SDK falls back to 6 minutes. A shorter caller
 context deadline still wins and cancels queued/pending manual approval.

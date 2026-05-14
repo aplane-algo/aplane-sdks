@@ -248,11 +248,11 @@ responses.
 ### Identity Status
 
 ```python
-identity = client.get_identity()
+identity = client.get_status()
 print(identity.state, identity.keyset_revision, identity.approval_wait_seconds)
 ```
 
-`get_identity()` calls authenticated `/identity`. It does not require unlock; a
+`get_status()` calls authenticated `/status`. It does not require unlock; a
 locked signer is returned as status data. Use `keyset_revision` as a
 process-local signal to refresh `list_keys(refresh=True)` only when the loaded
 keyset changes. Do not treat it as durable across apsigner restarts.

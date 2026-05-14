@@ -71,11 +71,11 @@ class TestHealth:
 
 
 # ---------------------------------------------------------------------------
-# get_identity
+# get_status
 # ---------------------------------------------------------------------------
 
-class TestGetIdentity:
-    def test_returns_identity_status(self):
+class TestGetStatus:
+    def test_returns_signer_status(self):
         client = make_client()
         resp = mock_response(200, {
             "identity_id": "default",
@@ -88,12 +88,12 @@ class TestGetIdentity:
         })
 
         with patch.object(client.session, "get", return_value=resp) as mock_get:
-            identity = client.get_identity()
+            identity = client.get_status()
 
         assert identity.identity_id == "default"
         assert identity.keyset_revision == 4
         assert identity.approval_wait_seconds == 60
-        assert mock_get.call_args.args[0] == "http://localhost:11270/identity"
+        assert mock_get.call_args.args[0] == "http://localhost:11270/status"
         assert mock_get.call_args.kwargs["timeout"] == 5
 
     def test_locked_state_is_success(self):
@@ -108,7 +108,7 @@ class TestGetIdentity:
         })
 
         with patch.object(client.session, "get", return_value=resp):
-            identity = client.get_identity()
+            identity = client.get_status()
 
         assert identity.state == "locked"
         assert identity.signer_locked is True
@@ -118,7 +118,7 @@ class TestGetIdentity:
         client = make_client()
         with patch.object(client.session, "get", return_value=mock_response(401)):
             with pytest.raises(AuthenticationError):
-                client.get_identity()
+                client.get_status()
 
 
 # ---------------------------------------------------------------------------
@@ -471,10 +471,10 @@ class TestSigningErrors:
 
         assert client._sign_request_timeout() == 360
 
-    def test_identity_discovery_failure_does_not_fail_sign(self):
+    def test_status_discovery_failure_does_not_fail_sign(self):
         client = make_client()
         resp = mock_response(200, {"signed": ["deadbeef"]})
-        with patch.object(client, "get_identity", side_effect=SignerUnavailableError("down")), \
+        with patch.object(client, "get_status", side_effect=SignerUnavailableError("down")), \
              patch.object(client.session, "post", return_value=resp), \
              patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             signed = client.sign_transaction(self._make_mock_txn())

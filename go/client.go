@@ -38,7 +38,7 @@ type SignerClient struct {
 
 const (
 	healthTimeout             = 3 * time.Second
-	identityTimeout           = 5 * time.Second
+	statusTimeout             = 5 * time.Second
 	inventoryTimeout          = 30 * time.Second
 	mutationTimeout           = 60 * time.Second
 	groupPlanTimeout          = 60 * time.Second
@@ -217,17 +217,17 @@ func (c *SignerClient) Health() (bool, error) {
 	return resp.StatusCode == 200, nil
 }
 
-// GetIdentity fetches authenticated identity status and keyset revision.
-func (c *SignerClient) GetIdentity() (*IdentityResponse, error) {
-	return c.GetIdentityWithContext(context.Background())
+// GetStatus fetches authenticated signer status and keyset revision.
+func (c *SignerClient) GetStatus() (*StatusResponse, error) {
+	return c.GetStatusWithContext(context.Background())
 }
 
-// GetIdentityWithContext fetches authenticated identity status and keyset revision.
-func (c *SignerClient) GetIdentityWithContext(ctx context.Context) (*IdentityResponse, error) {
-	reqCtx, cancel := c.requestContext(ctx, identityTimeout)
+// GetStatusWithContext fetches authenticated signer status and keyset revision.
+func (c *SignerClient) GetStatusWithContext(ctx context.Context) (*StatusResponse, error) {
+	reqCtx, cancel := c.requestContext(ctx, statusTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(reqCtx, "GET", c.baseURL+"/identity", nil)
+	req, err := http.NewRequestWithContext(reqCtx, "GET", c.baseURL+"/status", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -235,7 +235,7 @@ func (c *SignerClient) GetIdentityWithContext(ctx context.Context) (*IdentityRes
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get identity status: %w", err)
+		return nil, fmt.Errorf("failed to get signer status: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -249,7 +249,7 @@ func (c *SignerClient) GetIdentityWithContext(ctx context.Context) (*IdentityRes
 		return nil, fmt.Errorf("signer error (%d): %s", resp.StatusCode, readErrorBody(resp))
 	}
 
-	var identityResp IdentityResponse
+	var identityResp StatusResponse
 	if err := json.NewDecoder(resp.Body).Decode(&identityResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
@@ -295,7 +295,7 @@ func (c *SignerClient) discoverApprovalWait(ctx context.Context) {
 	if !c.needsApprovalWaitDiscovery(time.Now()) {
 		return
 	}
-	_, _ = c.GetIdentityWithContext(ctx)
+	_, _ = c.GetStatusWithContext(ctx)
 }
 
 func (c *SignerClient) signRequestTimeout() time.Duration {

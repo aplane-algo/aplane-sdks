@@ -81,7 +81,7 @@ test(
     try {
       assert.equal(await client.health(), true);
 
-      const before = await client.getIdentity();
+      const before = await client.getStatus();
       assert.equal(before.readyForSigning, true);
       assert.equal(before.signerLocked, false);
 
@@ -143,12 +143,12 @@ async function waitForKeysetRevision(
   action: string
 ) {
   const deadline = Date.now() + 5000;
-  let last: Awaited<ReturnType<SignerClient["getIdentity"]>> | undefined;
+  let last: Awaited<ReturnType<SignerClient["getStatus"]>> | undefined;
   let lastError: unknown;
 
   while (Date.now() < deadline) {
     try {
-      last = await client.getIdentity();
+      last = await client.getStatus();
       if (last.keysetRevision > previous) {
         return last;
       }

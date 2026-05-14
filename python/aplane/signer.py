@@ -59,7 +59,7 @@ import paramiko
 DEFAULT_SSH_PORT = 1127
 DEFAULT_SIGNER_PORT = 11270
 HEALTH_TIMEOUT = 3
-IDENTITY_TIMEOUT = 5
+STATUS_TIMEOUT = 5
 INVENTORY_TIMEOUT = 30
 MUTATION_TIMEOUT = 60
 GROUP_PLAN_TIMEOUT = 60
@@ -235,8 +235,8 @@ class KeyTypeInfo:
 
 
 @dataclass
-class IdentityResponse:
-    """Authenticated identity status from /identity"""
+class StatusResponse:
+    """Authenticated signer status from /status"""
     identity_id: str
     state: str
     signer_locked: bool
@@ -763,17 +763,17 @@ class SignerClient:
         except requests.RequestException:
             return False
 
-    def get_identity(self) -> IdentityResponse:
+    def get_status(self) -> StatusResponse:
         """
-        Fetch authenticated identity status and keyset revision.
+        Fetch authenticated signer status and keyset revision.
 
-        /identity is authenticated but does not require unlock. A locked state
+        /status is authenticated but does not require unlock. A locked state
         in a 200 response is returned as normal data.
         """
         try:
             resp = self.session.get(
-                f"{self.base_url}/identity",
-                timeout=self._timeout_for(IDENTITY_TIMEOUT)
+                f"{self.base_url}/status",
+                timeout=self._timeout_for(STATUS_TIMEOUT)
             )
         except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
@@ -785,10 +785,10 @@ class SignerClient:
             raise SignerUnavailableError("Signer unavailable")
 
         if resp.status_code != 200:
-            raise SignerError(f"Failed to get identity status: HTTP {resp.status_code}")
+            raise SignerError(f"Failed to get signer status: HTTP {resp.status_code}")
 
         data = resp.json()
-        identity = IdentityResponse(
+        identity = StatusResponse(
             identity_id=data.get("identity_id", ""),
             state=data.get("state", ""),
             signer_locked=data.get("signer_locked", False),
@@ -829,9 +829,9 @@ class SignerClient:
         if not self._needs_approval_wait_discovery():
             return
         try:
-            self.get_identity()
+            self.get_status()
         except SignerError:
-            # /identity discovery failure must not fail /sign; use fallback.
+            # /status discovery failure must not fail /sign; use fallback.
             pass
 
     def _sign_request_timeout(self) -> int:

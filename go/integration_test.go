@@ -111,7 +111,7 @@ func TestIntegrationLiveSignerClientWorkflow(t *testing.T) {
 		t.Fatal("signer is not healthy")
 	}
 
-	before, err := client.GetIdentity()
+	before, err := client.GetStatus()
 	if err != nil {
 		t.Fatalf("get identity before generate: %v", err)
 	}
@@ -221,14 +221,14 @@ func hasKey(keys []KeyInfo, address string) bool {
 	return false
 }
 
-func waitForKeysetRevision(t *testing.T, client *SignerClient, previous uint64, action string) *IdentityResponse {
+func waitForKeysetRevision(t *testing.T, client *SignerClient, previous uint64, action string) *StatusResponse {
 	t.Helper()
 
 	deadline := time.Now().Add(5 * time.Second)
-	var last *IdentityResponse
+	var last *StatusResponse
 	var lastErr error
 	for time.Now().Before(deadline) {
-		identity, err := client.GetIdentity()
+		identity, err := client.GetStatus()
 		if err == nil {
 			last = identity
 			if identity.KeysetRevision > previous {
