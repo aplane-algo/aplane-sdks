@@ -114,6 +114,65 @@ describe("SignerClient", () => {
     });
   });
 
+  describe("getIdentity", () => {
+    it("returns authenticated identity status", async () => {
+      mockFetch.mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({
+          identity_id: "default",
+          state: "unlocked",
+          signer_locked: false,
+          ready_for_signing: true,
+          key_count: 37,
+          keyset_revision: 4,
+          approval_wait_seconds: 60,
+        }),
+      });
+
+      const client = new SignerClient("http://localhost:11270", "test-token");
+      const identity = await client.getIdentity();
+
+      assert.equal(identity.identityId, "default");
+      assert.equal(identity.keysetRevision, 4);
+      assert.equal(identity.approvalWaitSeconds, 60);
+      assert.equal(mockFetch.mock.calls[0][0], "http://localhost:11270/identity");
+      assert.equal(mockFetch.mock.calls[0][1].method, "GET");
+    });
+
+    it("returns locked state as successful identity data", async () => {
+      mockFetch.mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({
+          identity_id: "default",
+          state: "locked",
+          signer_locked: true,
+          ready_for_signing: false,
+          key_count: 0,
+          keyset_revision: 2,
+        }),
+      });
+
+      const client = new SignerClient("http://localhost:11270", "test-token");
+      const identity = await client.getIdentity();
+
+      assert.equal(identity.state, "locked");
+      assert.equal(identity.signerLocked, true);
+      assert.equal(identity.readyForSigning, false);
+    });
+
+    it("throws AuthenticationError on 401", async () => {
+      mockFetch.mockResolvedValueOnce({
+        status: 401,
+        ok: false,
+      });
+
+      const client = new SignerClient("http://localhost:11270", "test-token");
+      await assert.rejects(client.getIdentity(), AuthenticationError);
+    });
+  });
+
   describe("listKeys", () => {
     it("returns list of keys", async () => {
       const mockKeys = {

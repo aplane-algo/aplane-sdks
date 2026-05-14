@@ -71,6 +71,57 @@ class TestHealth:
 
 
 # ---------------------------------------------------------------------------
+# get_identity
+# ---------------------------------------------------------------------------
+
+class TestGetIdentity:
+    def test_returns_identity_status(self):
+        client = make_client()
+        resp = mock_response(200, {
+            "identity_id": "default",
+            "state": "unlocked",
+            "signer_locked": False,
+            "ready_for_signing": True,
+            "key_count": 37,
+            "keyset_revision": 4,
+            "approval_wait_seconds": 60,
+        })
+
+        with patch.object(client.session, "get", return_value=resp) as mock_get:
+            identity = client.get_identity()
+
+        assert identity.identity_id == "default"
+        assert identity.keyset_revision == 4
+        assert identity.approval_wait_seconds == 60
+        assert mock_get.call_args.args[0] == "http://localhost:11270/identity"
+        assert mock_get.call_args.kwargs["timeout"] == 5
+
+    def test_locked_state_is_success(self):
+        client = make_client()
+        resp = mock_response(200, {
+            "identity_id": "default",
+            "state": "locked",
+            "signer_locked": True,
+            "ready_for_signing": False,
+            "key_count": 0,
+            "keyset_revision": 2,
+        })
+
+        with patch.object(client.session, "get", return_value=resp):
+            identity = client.get_identity()
+
+        assert identity.state == "locked"
+        assert identity.signer_locked is True
+        assert identity.ready_for_signing is False
+
+    def test_auth_error(self):
+        client = make_client()
+        with patch.object(client.session, "get", return_value=mock_response(401)):
+            with pytest.raises(AuthenticationError):
+                client.get_identity()
+
+
+# ---------------------------------------------------------------------------
 # list_keys
 # ---------------------------------------------------------------------------
 

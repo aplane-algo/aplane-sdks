@@ -14,6 +14,7 @@ import type {
   LsigArgsMap,
   SignRequest,
   GroupSignResponse,
+  IdentityResponse,
   KeysResponse,
   KeyTypesResponse,
   KeyTypeInfo,
@@ -470,6 +471,42 @@ export class SignerClient {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Fetch authenticated identity status and keyset revision.
+   *
+   * /identity is authenticated but does not require the signer to be unlocked.
+   * A locked state in a 200 response is returned as normal data.
+   */
+  async getIdentity(): Promise<IdentityResponse> {
+    const response = await this.fetch("/identity", {
+      method: "GET",
+      timeout: 5000,
+    });
+
+    if (response.status === 401) {
+      throw new AuthenticationError();
+    }
+    if (response.status === 503) {
+      throw new SignerUnavailableError("Signer unavailable");
+    }
+    if (response.status !== 200) {
+      throw new SignerError(`Failed to get identity status: HTTP ${response.status}`);
+    }
+
+    const data = (await response.json()) as Record<string, unknown>;
+    const identity: IdentityResponse = {
+      identityId: String(data.identity_id || ""),
+      state: String(data.state || ""),
+      signerLocked: Boolean(data.signer_locked),
+      readyForSigning: Boolean(data.ready_for_signing),
+      keyCount: Number(data.key_count || 0),
+      keysetRevision: Number(data.keyset_revision || 0),
+      approvalWaitSeconds:
+        typeof data.approval_wait_seconds === "number" ? data.approval_wait_seconds : undefined,
+    };
+    return identity;
   }
 
   /**

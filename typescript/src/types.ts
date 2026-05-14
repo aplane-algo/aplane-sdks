@@ -153,6 +153,26 @@ export interface KeyTypeInfo {
 }
 
 /**
+ * Response from the /identity endpoint.
+ */
+export interface IdentityResponse {
+  /** Authenticated identity ID resolved from the signer token */
+  identityId: string;
+  /** Current lock state: "locked", "unlocked", or "unknown" */
+  state: string;
+  /** True when the signer identity is locked */
+  signerLocked: boolean;
+  /** True when the identity can currently sign */
+  readyForSigning: boolean;
+  /** Number of currently loaded keys */
+  keyCount: number;
+  /** Process-local keyset revision for refresh decisions */
+  keysetRevision: number;
+  /** Effective manual approval wait in seconds, when provided */
+  approvalWaitSeconds?: number;
+}
+
+/**
  * Result of key generation.
  */
 export interface GenerateResult {

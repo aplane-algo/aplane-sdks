@@ -56,6 +56,7 @@ from .signer import (
     ClientConfig,
     CreationParam,
     KeyTypeInfo,
+    IdentityResponse,
     GenerateResult,
 )
 
@@ -95,5 +96,6 @@ __all__ = [
     "ClientConfig",
     "CreationParam",
     "KeyTypeInfo",
+    "IdentityResponse",
     "GenerateResult",
 ]

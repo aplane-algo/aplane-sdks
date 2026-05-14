@@ -286,6 +286,76 @@ func TestHealth_NetworkError(t *testing.T) {
 	}
 }
 
+// --- GetIdentity tests ---
+
+func TestGetIdentity_Success(t *testing.T) {
+	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/identity" {
+			t.Fatalf("request = %s %s, want GET /identity", r.Method, r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "aplane test-token" {
+			t.Fatalf("Authorization = %q, want aplane test-token", got)
+		}
+		json.NewEncoder(w).Encode(IdentityResponse{
+			IdentityID:          "default",
+			State:               "unlocked",
+			ReadyForSigning:     true,
+			KeyCount:            37,
+			KeysetRevision:      4,
+			ApprovalWaitSeconds: 60,
+		})
+	})
+	defer server.Close()
+
+	identity, err := client.GetIdentity()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if identity.IdentityID != "default" {
+		t.Fatalf("IdentityID = %q, want default", identity.IdentityID)
+	}
+	if identity.KeysetRevision != 4 {
+		t.Fatalf("KeysetRevision = %d, want 4", identity.KeysetRevision)
+	}
+	if identity.ApprovalWaitSeconds != 60 {
+		t.Fatalf("ApprovalWaitSeconds = %d, want 60", identity.ApprovalWaitSeconds)
+	}
+}
+
+func TestGetIdentity_LockedStateIsSuccess(t *testing.T) {
+	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(IdentityResponse{
+			IdentityID:      "default",
+			State:           "locked",
+			SignerLocked:    true,
+			ReadyForSigning: false,
+			KeyCount:        0,
+			KeysetRevision:  2,
+		})
+	})
+	defer server.Close()
+
+	identity, err := client.GetIdentity()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if identity.State != "locked" || !identity.SignerLocked {
+		t.Fatalf("identity locked state not mapped: %#v", identity)
+	}
+}
+
+func TestGetIdentity_AuthError(t *testing.T) {
+	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+	defer server.Close()
+
+	_, err := client.GetIdentity()
+	if err != ErrAuthentication {
+		t.Fatalf("expected ErrAuthentication, got: %v", err)
+	}
+}
+
 // --- ListKeys tests ---
 
 func TestListKeys_Success(t *testing.T) {

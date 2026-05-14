@@ -71,6 +71,7 @@ export type {
   RuntimeArg,
   CreationParam,
   KeyTypeInfo,
+  IdentityResponse,
   GenerateResult,
   ClientConfig,
   SSHConfig,

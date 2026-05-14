@@ -101,12 +101,36 @@ func TestGoSDKContractFixturesRoundTrip(t *testing.T) {
 		{"admin_generate_request_generic.json", assertSDKContractRoundTrip[generateRequest]},
 		{"admin_generate_response_generic.json", assertSDKContractRoundTrip[GenerateResult]},
 		{"health_response_ready.json", assertSDKContractRoundTrip[HealthResponse]},
+		{"identity_response_ready.json", assertSDKContractRoundTrip[IdentityResponse]},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.run(t, tt.name)
 		})
+	}
+}
+
+func TestGoSDKContractIdentityMetadata(t *testing.T) {
+	raw, err := os.ReadFile(sdkContractFixturePath(t, "identity_response_ready.json"))
+	if err != nil {
+		t.Fatalf("read identity fixture: %v", err)
+	}
+	var resp IdentityResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		t.Fatalf("unmarshal identity fixture: %v", err)
+	}
+	if resp.IdentityID != "default" {
+		t.Fatalf("IdentityID = %q, want default", resp.IdentityID)
+	}
+	if resp.State != "unlocked" {
+		t.Fatalf("State = %q, want unlocked", resp.State)
+	}
+	if resp.KeysetRevision != 4 {
+		t.Fatalf("KeysetRevision = %d, want 4", resp.KeysetRevision)
+	}
+	if resp.ApprovalWaitSeconds != 60 {
+		t.Fatalf("ApprovalWaitSeconds = %d, want 60", resp.ApprovalWaitSeconds)
 	}
 }
 

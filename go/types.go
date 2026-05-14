@@ -163,6 +163,17 @@ type HealthResponse struct {
 	IPCEnabled      bool   `json:"ipc_enabled"`
 }
 
+// IdentityResponse is the response from the /identity endpoint.
+type IdentityResponse struct {
+	IdentityID          string `json:"identity_id"`
+	State               string `json:"state"`
+	SignerLocked        bool   `json:"signer_locked"`
+	ReadyForSigning     bool   `json:"ready_for_signing"`
+	KeyCount            int    `json:"key_count"`
+	KeysetRevision      uint64 `json:"keyset_revision"`
+	ApprovalWaitSeconds int64  `json:"approval_wait_seconds,omitempty"`
+}
+
 // RuntimeArg describes a runtime argument for generic LogicSig keys.
 type RuntimeArg struct {
 	Name        string `json:"name"`

@@ -225,6 +225,18 @@ class KeyTypeInfo:
 
 
 @dataclass
+class IdentityResponse:
+    """Authenticated identity status from /identity"""
+    identity_id: str
+    state: str
+    signer_locked: bool
+    ready_for_signing: bool
+    key_count: int
+    keyset_revision: int
+    approval_wait_seconds: int = 0
+
+
+@dataclass
 class GenerateResult:
     """Result of key generation"""
     address: str
@@ -558,6 +570,7 @@ class SignerClient:
         self.session.headers["Authorization"] = f"aplane {token}"
         self._tunnel = tunnel
         self._key_cache: Dict[str, KeyInfo] = {}  # Cache key info by address
+        self._approval_wait_seconds: Optional[int] = None
 
     @classmethod
     def connect_ssh(
@@ -731,6 +744,46 @@ class SignerClient:
             return resp.status_code == 200
         except requests.RequestException:
             return False
+
+    def get_identity(self) -> IdentityResponse:
+        """
+        Fetch authenticated identity status and keyset revision.
+
+        /identity is authenticated but does not require unlock. A locked state
+        in a 200 response is returned as normal data.
+        """
+        try:
+            resp = self.session.get(
+                f"{self.base_url}/identity",
+                timeout=5
+            )
+        except requests.RequestException as e:
+            raise SignerUnavailableError(f"Failed to connect: {e}")
+
+        if resp.status_code == 401:
+            raise AuthenticationError("Invalid or missing token")
+
+        if resp.status_code == 503:
+            raise SignerUnavailableError("Signer unavailable")
+
+        if resp.status_code != 200:
+            raise SignerError(f"Failed to get identity status: HTTP {resp.status_code}")
+
+        data = resp.json()
+        identity = IdentityResponse(
+            identity_id=data.get("identity_id", ""),
+            state=data.get("state", ""),
+            signer_locked=data.get("signer_locked", False),
+            ready_for_signing=data.get("ready_for_signing", False),
+            key_count=data.get("key_count", 0),
+            keyset_revision=data.get("keyset_revision", 0),
+            approval_wait_seconds=data.get("approval_wait_seconds", 0),
+        )
+        self._cache_approval_wait(identity.approval_wait_seconds)
+        return identity
+
+    def _cache_approval_wait(self, seconds: int) -> None:
+        self._approval_wait_seconds = seconds
 
     def list_keys(self, refresh: bool = False) -> List[KeyInfo]:
         """

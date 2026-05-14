@@ -27,6 +27,10 @@ type SignerClient struct {
 	sshTunnel *sshTunnel
 	keyMu     sync.RWMutex
 	keyCache  map[string]*KeyInfo
+
+	approvalMu          sync.RWMutex
+	approvalWaitSeconds int64
+	approvalWaitFetched time.Time
 }
 
 // NewSignerClientWithToken creates a signer client for an already-known base URL.
@@ -163,6 +167,51 @@ func (c *SignerClient) Health() (bool, error) {
 	defer resp.Body.Close()
 
 	return resp.StatusCode == 200, nil
+}
+
+// GetIdentity fetches authenticated identity status and keyset revision.
+func (c *SignerClient) GetIdentity() (*IdentityResponse, error) {
+	return c.GetIdentityWithContext(context.Background())
+}
+
+// GetIdentityWithContext fetches authenticated identity status and keyset revision.
+func (c *SignerClient) GetIdentityWithContext(ctx context.Context) (*IdentityResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/identity", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "aplane "+c.token)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get identity status: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, ErrAuthentication
+	}
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		return nil, ErrSignerUnavailable
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("signer error (%d): %s", resp.StatusCode, readErrorBody(resp))
+	}
+
+	var identityResp IdentityResponse
+	if err := json.NewDecoder(resp.Body).Decode(&identityResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	c.cacheApprovalWait(identityResp.ApprovalWaitSeconds)
+
+	return &identityResp, nil
+}
+
+func (c *SignerClient) cacheApprovalWait(seconds int64) {
+	c.approvalMu.Lock()
+	defer c.approvalMu.Unlock()
+	c.approvalWaitSeconds = seconds
+	c.approvalWaitFetched = time.Now()
 }
 
 // ListKeys returns all available signing keys.

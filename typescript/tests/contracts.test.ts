@@ -160,6 +160,25 @@ describe("signer API contract fixtures", () => {
     assert.equal(timelock.runtimeArgs?.[0].byteLength, 32);
   });
 
+  it("maps /identity wire fields to public IdentityResponse fields", async () => {
+    mockFetch.mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: async () => fixture("identity_response_ready.json"),
+    });
+
+    const client = new SignerClient("http://localhost:11270", "test-token");
+    const identity = await client.getIdentity();
+
+    assert.equal(identity.identityId, "default");
+    assert.equal(identity.state, "unlocked");
+    assert.equal(identity.signerLocked, false);
+    assert.equal(identity.readyForSigning, true);
+    assert.equal(identity.keyCount, 37);
+    assert.equal(identity.keysetRevision, 4);
+    assert.equal(identity.approvalWaitSeconds, 60);
+  });
+
   it("maps optional /keys template warning fields", async () => {
     mockFetch.mockResolvedValueOnce({
       status: 200,
