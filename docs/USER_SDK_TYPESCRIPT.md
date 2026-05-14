@@ -238,7 +238,8 @@ This is useful when:
 
 Prefer the SSH-backed paths above. For advanced integrations that already own
 the HTTP transport path, the public `SignerClient(baseUrl, token, timeout)`
-constructor can be used directly.
+constructor can be used directly. An explicit timeout shorter than the signer
+approval wait will cancel queued/pending manual approval.
 
 ## Common Tasks
 
@@ -247,6 +248,21 @@ constructor can be used directly.
 ```ts
 const healthy = await client.health();
 ```
+
+### Identity Status
+
+```ts
+const identity = await client.getIdentity();
+console.log(identity.state, identity.keysetRevision, identity.approvalWaitSeconds);
+```
+
+`getIdentity()` calls authenticated `/identity`. It does not require unlock; a
+locked signer is returned as status data. Use `keysetRevision` as a
+process-local signal to refresh `listKeys(true)` only when the loaded keyset
+changes. Do not treat it as durable across apsigner restarts.
+
+The SDK also uses `approvalWaitSeconds` to size `/sign` deadlines. If discovery
+fails or an older signer omits the field, signing falls back to 6 minutes.
 
 ### List Keys
 

@@ -101,7 +101,7 @@ client = SignerClient.connect_ssh(
     ssh_key_path="~/.ssh/id_ed25519",
     ssh_port=1127,                # default: 1127
     signer_port=11270,            # default: 11270
-    timeout=90                    # seconds, default
+    timeout=30                    # optional explicit shorter request timeout
 )
 ```
 
@@ -146,6 +146,19 @@ Check if signer is reachable.
 if client.health():
     print("Signer is online")
 ```
+
+#### `get_identity() -> IdentityResponse`
+
+Fetch authenticated identity status. This works while the signer is locked.
+
+```python
+identity = client.get_identity()
+print(identity.state, identity.keyset_revision)
+```
+
+`keyset_revision` is process-local and useful for deciding when to refresh
+`list_keys(refresh=True)`; it is not durable across apsigner restarts.
+`approval_wait_seconds` is used by the SDK to size `/sign` deadlines.
 
 #### `list_keys() -> List[KeyInfo]`
 
@@ -223,6 +236,11 @@ Like `sign_transactions()` but returns individual base64-encoded transactions in
 signed_list = client.sign_transactions_list([txn1, txn2])
 # signed_list is List[str], each element is a base64-encoded signed transaction
 ```
+
+Signing calls discover `/identity.approval_wait_seconds` and use that value
+plus 30 seconds of slack for the request timeout. If discovery fails or an older
+signer omits the field, signing falls back to 6 minutes. An explicit shorter
+timeout still wins and cancels queued/pending manual approval.
 
 #### `close()`
 

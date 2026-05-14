@@ -87,7 +87,7 @@ client, err := aplane.ConnectSSH(
 	&aplane.SSHConnectOptions{
 		SSHPort:    1127,   // default
 		SignerPort: 11270,  // default
-		Timeout:    90,     // seconds, default
+		Timeout:    30,     // optional explicit shorter request timeout
 	},
 )
 if err != nil {
@@ -162,7 +162,9 @@ defer client.Close()
 ```
 
 This mode is intended for advanced callers that already control the connection
-path to `apsigner`.
+path to `apsigner`. If you set `http.Client.Timeout`, it is a hard cap on
+every request, including approval-backed signing; the SDK cannot extend a
+caller-owned transport timeout.
 
 ## API Reference
 
@@ -175,6 +177,23 @@ Check if signer is reachable.
 ```go
 healthy, err := client.Health()
 ```
+
+#### `GetIdentity() (*IdentityResponse, error)`
+
+Fetch authenticated identity status. This endpoint works while the signer is
+locked and exposes `KeysetRevision` plus `ApprovalWaitSeconds`.
+
+```go
+identity, err := client.GetIdentity()
+if err != nil {
+	log.Fatal(err)
+}
+fmt.Println(identity.State, identity.KeysetRevision)
+```
+
+`KeysetRevision` is process-local and useful for deciding when to refresh
+`/keys`; it is not a durable storage version. `ApprovalWaitSeconds` is used by
+the SDK to size `/sign` deadlines.
 
 #### `ListKeys(refresh bool) ([]KeyInfo, error)`
 
@@ -254,6 +273,11 @@ signResp, err := client.SignRequestsWithContext(ctx, []aplane.SignRequest{
 	{AuthAddress: authAddr, TxnSender: sender, TxnBytesHex: txnHex},
 })
 ```
+
+Signing requests discover `/identity.approval_wait_seconds` and use that value
+plus 30 seconds of slack for the HTTP deadline. If discovery fails or an older
+signer omits the field, the SDK falls back to 6 minutes. A shorter caller
+context deadline still wins and cancels queued/pending manual approval.
 
 ### Config Helpers
 

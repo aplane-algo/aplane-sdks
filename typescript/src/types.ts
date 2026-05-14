@@ -76,7 +76,7 @@ export interface ConnectSshOptions {
   sshPort?: number;
   /** Signer REST port on remote (default: 11270) */
   signerPort?: number;
-  /** Request timeout in milliseconds (default: 90000) */
+  /** Optional explicit shorter request timeout in milliseconds */
   timeout?: number;
   /** Path to known_hosts file for SSH host key verification (required) */
   knownHostsPath?: string;
@@ -90,7 +90,7 @@ export interface ConnectSshOptions {
 export interface FromEnvOptions {
   /** Override default data directory */
   dataDir?: string;
-  /** Request timeout in milliseconds (default: 90000) */
+  /** Optional explicit shorter request timeout in milliseconds */
   timeout?: number;
 }
 

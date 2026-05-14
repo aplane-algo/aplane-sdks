@@ -229,7 +229,9 @@ product SSH flow.
 
 The low-level constructor `SignerClient(base_url, token, timeout=...)` exists
 and can be used if you already own the HTTP transport path. The normal product
-and convenience flow remains the SSH-backed path shown above.
+and convenience flow remains the SSH-backed path shown above. An explicit
+timeout shorter than the signer approval wait will cancel queued/pending manual
+approval.
 
 ## Common Tasks
 
@@ -242,6 +244,22 @@ if client.health():
 
 `health()` returns `True` on HTTP 200 and `False` on unreachable or unhealthy
 responses.
+
+### Identity Status
+
+```python
+identity = client.get_identity()
+print(identity.state, identity.keyset_revision, identity.approval_wait_seconds)
+```
+
+`get_identity()` calls authenticated `/identity`. It does not require unlock; a
+locked signer is returned as status data. Use `keyset_revision` as a
+process-local signal to refresh `list_keys(refresh=True)` only when the loaded
+keyset changes. Do not treat it as durable across apsigner restarts.
+
+The SDK also uses `approval_wait_seconds` to size `/sign` deadlines. If
+discovery fails or an older signer omits the field, signing falls back to 6
+minutes.
 
 ### List Keys
 

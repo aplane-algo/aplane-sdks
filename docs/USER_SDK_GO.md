@@ -171,7 +171,7 @@ client, err := aplane.ConnectSSH(
 	&aplane.SSHConnectOptions{
 		SSHPort:         1127,
 		SignerPort:      11270,
-		Timeout:         90,
+		Timeout:         30, // optional explicit shorter request timeout
 		KnownHostsPath:  "~/.ssh/known_hosts",
 		TrustOnFirstUse: false,
 	},
@@ -212,6 +212,26 @@ Use this when:
 ```go
 healthy, err := client.Health()
 ```
+
+### Identity Status
+
+```go
+identity, err := client.GetIdentity()
+if err != nil {
+	return err
+}
+fmt.Println(identity.State, identity.KeysetRevision, identity.ApprovalWaitSeconds)
+```
+
+`GetIdentity(...)` calls authenticated `/identity`. It does not require the
+signer to be unlocked; a locked signer is returned as status data. Use
+`KeysetRevision` as a process-local signal to refresh `/keys` only when the
+loaded keyset changes. Do not treat it as a durable version across apsigner
+restarts.
+
+The SDK also uses `ApprovalWaitSeconds` to size `/sign` deadlines. If discovery
+fails or an older signer omits the field, signing falls back to a 6-minute
+deadline.
 
 ### List Keys
 
@@ -480,6 +500,10 @@ if err != nil {
   `HexToBytes(...)`, and `BytesToHex(...)` are exported for integration code.
 - `SignRequestsWithContext(...)` and `PlanRequestsWithContext(...)` let you
   bypass the transaction-to-request builder when you need raw request control.
+- Signing request deadlines are approval-wait-aware. A shorter caller context
+  deadline still wins and cancels queued/pending manual approval.
+- If you call `SetHTTPClient(...)` with a client-level timeout, that timeout is
+  a hard cap and the SDK cannot extend it for long approval waits.
 - `known_hosts` verification is required for SSH unless you deliberately enable
   trust-on-first-use behavior.
 

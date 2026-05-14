@@ -86,7 +86,7 @@ const client = await SignerClient.connectSsh(
   {
     sshPort: 1127,           // default: 1127
     signerPort: 11270,       // default: 11270
-    timeout: 90000,          // milliseconds, default
+    timeout: 30000,          // optional explicit shorter request timeout
   }
 );
 ```
@@ -163,6 +163,19 @@ if (await client.health()) {
   console.log("Signer is online");
 }
 ```
+
+#### `getIdentity(): Promise<IdentityResponse>`
+
+Fetch authenticated identity status. This works while the signer is locked.
+
+```typescript
+const identity = await client.getIdentity();
+console.log(identity.state, identity.keysetRevision);
+```
+
+`keysetRevision` is process-local and useful for deciding when to refresh
+`listKeys(true)`; it is not durable across apsigner restarts.
+`approvalWaitSeconds` is used by the SDK to size `/sign` deadlines.
 
 #### `listKeys(refresh?: boolean): Promise<KeyInfo[]>`
 
@@ -243,6 +256,11 @@ Like `signTransactions()` but returns individual base64-encoded transactions ins
 const signedList = await client.signTransactionsList([txn1, txn2]);
 // signedList is string[], each element is a base64-encoded signed transaction
 ```
+
+Signing calls discover `/identity.approval_wait_seconds` and use that value
+plus 30 seconds of slack for the request timeout. If discovery fails or an older
+signer omits the field, signing falls back to 6 minutes. An explicit shorter
+timeout still wins and cancels queued/pending manual approval.
 
 ## Supported Key Types
 
