@@ -1,4 +1,4 @@
-.PHONY: test go-test python-test typescript-test integration-test go-integration-test python-integration-test typescript-integration-test clean
+.PHONY: test go-test python-test typescript-test integration-test integration-preflight go-integration-test python-integration-test typescript-integration-test clean
 
 test: go-test python-test typescript-test
 
@@ -11,7 +11,10 @@ python-test:
 typescript-test:
 	cd typescript && npm test
 
-integration-test: go-integration-test python-integration-test typescript-integration-test
+integration-test: integration-preflight go-integration-test python-integration-test typescript-integration-test
+
+integration-preflight:
+	@./scripts/preflight-integration.sh
 
 go-integration-test:
 	@echo "Running Go SDK integration tests..."
