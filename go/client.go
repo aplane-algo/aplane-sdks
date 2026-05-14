@@ -28,10 +28,25 @@ type SignerClient struct {
 	keyMu     sync.RWMutex
 	keyCache  map[string]*KeyInfo
 
+	requestTimeout      time.Duration
+	requestTimeoutSet   bool
 	approvalMu          sync.RWMutex
 	approvalWaitSeconds int64
 	approvalWaitFetched time.Time
+	approvalWaitKnown   bool
 }
+
+const (
+	healthTimeout             = 3 * time.Second
+	identityTimeout           = 5 * time.Second
+	inventoryTimeout          = 30 * time.Second
+	mutationTimeout           = 60 * time.Second
+	groupPlanTimeout          = 60 * time.Second
+	signApprovalSlack         = 30 * time.Second
+	defaultSignRequestTimeout = 6 * time.Minute
+	maxDiscoveredApprovalWait = 30 * time.Minute
+	approvalWaitRefresh       = 5 * time.Minute
+)
 
 // NewSignerClientWithToken creates a signer client for an already-known base URL.
 // This is useful when the caller owns the transport or tunnel lifecycle.
@@ -39,7 +54,7 @@ func NewSignerClientWithToken(baseURL, token string) *SignerClient {
 	return &SignerClient{
 		baseURL:  baseURL,
 		token:    token,
-		client:   &http.Client{Timeout: time.Duration(DefaultTimeout) * time.Second},
+		client:   &http.Client{},
 		keyCache: nil,
 	}
 }
@@ -57,6 +72,31 @@ func readErrorBody(resp *http.Response) string {
 		return fmt.Sprintf("<failed to read error body: %v>", err)
 	}
 	return string(body)
+}
+
+func (c *SignerClient) requestContext(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return withDefaultTimeout(ctx, c.timeoutFor(timeout))
+}
+
+func (c *SignerClient) timeoutFor(defaultTimeout time.Duration) time.Duration {
+	if c.requestTimeoutSet && c.requestTimeout > 0 && c.requestTimeout < defaultTimeout {
+		return c.requestTimeout
+	}
+	return defaultTimeout
+}
+
+func withDefaultTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout <= 0 {
+		return ctx, func() {}
+	}
+	defaultDeadline := time.Now().Add(timeout)
+	if callerDeadline, ok := ctx.Deadline(); ok && !callerDeadline.After(defaultDeadline) {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, timeout)
 }
 
 // ConnectSSH creates a client connected via SSH tunnel.
@@ -90,10 +130,12 @@ func ConnectSSH(host, token, sshKeyPath string, opts *SSHConnectOptions) (*Signe
 	}
 
 	return &SignerClient{
-		baseURL:   fmt.Sprintf("http://localhost:%d", localPort),
-		token:     token,
-		client:    &http.Client{Timeout: time.Duration(timeout) * time.Second},
-		sshTunnel: tunnel,
+		baseURL:           fmt.Sprintf("http://localhost:%d", localPort),
+		token:             token,
+		client:            &http.Client{},
+		sshTunnel:         tunnel,
+		requestTimeout:    time.Duration(timeout) * time.Second,
+		requestTimeoutSet: opts != nil && opts.Timeout > 0,
 	}, nil
 }
 
@@ -102,7 +144,7 @@ func ConnectSSH(host, token, sshKeyPath string, opts *SSHConnectOptions) (*Signe
 // If config contains SSH settings, connects via SSH tunnel.
 func FromEnv(opts *FromEnvOptions) (*SignerClient, error) {
 	dataDir := ""
-	timeout := DefaultTimeout
+	timeout := 0
 
 	if opts != nil {
 		if opts.DataDir != "" {
@@ -137,13 +179,16 @@ func FromEnv(opts *FromEnvOptions) (*SignerClient, error) {
 
 	sshKeyPath := ResolvePath(config.SSH.IdentityFile, dataDir)
 	knownHostsPath := ResolvePath(config.SSH.KnownHostsPath, dataDir)
-	return ConnectSSH(config.SSH.Host, token, sshKeyPath, &SSHConnectOptions{
+	sshOpts := &SSHConnectOptions{
 		SSHPort:         config.SSH.Port,
 		SignerPort:      config.SignerPort,
-		Timeout:         timeout,
 		KnownHostsPath:  knownHostsPath,
 		TrustOnFirstUse: config.SSH.TrustOnFirstUse,
-	})
+	}
+	if timeout > 0 {
+		sshOpts.Timeout = timeout
+	}
+	return ConnectSSH(config.SSH.Host, token, sshKeyPath, sshOpts)
 }
 
 // Close closes the client and any SSH tunnel.
@@ -160,7 +205,10 @@ func (c *SignerClient) Health() (bool, error) {
 		return false, err
 	}
 
-	resp, err := c.client.Do(req)
+	reqCtx, cancel := c.requestContext(context.Background(), healthTimeout)
+	defer cancel()
+
+	resp, err := c.client.Do(req.WithContext(reqCtx))
 	if err != nil {
 		return false, nil // Not reachable
 	}
@@ -176,7 +224,10 @@ func (c *SignerClient) GetIdentity() (*IdentityResponse, error) {
 
 // GetIdentityWithContext fetches authenticated identity status and keyset revision.
 func (c *SignerClient) GetIdentityWithContext(ctx context.Context) (*IdentityResponse, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/identity", nil)
+	reqCtx, cancel := c.requestContext(ctx, identityTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, "GET", c.baseURL+"/identity", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -208,10 +259,51 @@ func (c *SignerClient) GetIdentityWithContext(ctx context.Context) (*IdentityRes
 }
 
 func (c *SignerClient) cacheApprovalWait(seconds int64) {
+	wait := int64(0)
+	if seconds > 0 && seconds <= int64(maxDiscoveredApprovalWait/time.Second) {
+		wait = seconds
+	}
 	c.approvalMu.Lock()
 	defer c.approvalMu.Unlock()
-	c.approvalWaitSeconds = seconds
+	c.approvalWaitSeconds = wait
 	c.approvalWaitFetched = time.Now()
+	c.approvalWaitKnown = true
+}
+
+func (c *SignerClient) cachedApprovalWait(now time.Time) (time.Duration, bool) {
+	c.approvalMu.RLock()
+	defer c.approvalMu.RUnlock()
+	if !c.approvalWaitKnown || c.approvalWaitSeconds <= 0 {
+		return 0, false
+	}
+	if now.Sub(c.approvalWaitFetched) > approvalWaitRefresh {
+		return 0, false
+	}
+	return time.Duration(c.approvalWaitSeconds) * time.Second, true
+}
+
+func (c *SignerClient) needsApprovalWaitDiscovery(now time.Time) bool {
+	c.approvalMu.RLock()
+	defer c.approvalMu.RUnlock()
+	if !c.approvalWaitKnown {
+		return true
+	}
+	return now.Sub(c.approvalWaitFetched) > approvalWaitRefresh
+}
+
+func (c *SignerClient) discoverApprovalWait(ctx context.Context) {
+	if !c.needsApprovalWaitDiscovery(time.Now()) {
+		return
+	}
+	_, _ = c.GetIdentityWithContext(ctx)
+}
+
+func (c *SignerClient) signRequestTimeout() time.Duration {
+	wait, ok := c.cachedApprovalWait(time.Now())
+	if !ok {
+		return defaultSignRequestTimeout
+	}
+	return wait + signApprovalSlack
 }
 
 // ListKeys returns all available signing keys.
@@ -273,7 +365,10 @@ func (c *SignerClient) cachedKeys() []KeyInfo {
 
 // GetKeysResponseWithContext fetches /keys with raw locked-state reporting.
 func (c *SignerClient) GetKeysResponseWithContext(ctx context.Context) (*KeysResponse, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/keys", nil)
+	reqCtx, cancel := c.requestContext(ctx, inventoryTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, "GET", c.baseURL+"/keys", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -317,7 +412,10 @@ func (c *SignerClient) GetKeysResponseWithContext(ctx context.Context) (*KeysRes
 
 // ListKeyTypes returns available key types and their creation parameters.
 func (c *SignerClient) ListKeyTypes() ([]KeyTypeInfo, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/keytypes", nil)
+	reqCtx, cancel := c.requestContext(context.Background(), inventoryTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, "GET", c.baseURL+"/keytypes", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +450,10 @@ func (c *SignerClient) GenerateKey(keyType string, parameters map[string]string)
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", c.baseURL+"/admin/generate", bytes.NewBuffer(jsonBody))
+	reqCtx, cancel := c.requestContext(context.Background(), mutationTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, "POST", c.baseURL+"/admin/generate", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +491,10 @@ func (c *SignerClient) GenerateKey(keyType string, parameters map[string]string)
 
 // DeleteKey deletes a key from the signer.
 func (c *SignerClient) DeleteKey(address string) error {
-	req, err := http.NewRequest("DELETE", c.baseURL+"/admin/keys?"+url.Values{"address": []string{address}}.Encode(), nil)
+	reqCtx, cancel := c.requestContext(context.Background(), mutationTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, "DELETE", c.baseURL+"/admin/keys?"+url.Values{"address": []string{address}}.Encode(), nil)
 	if err != nil {
 		return err
 	}
@@ -447,7 +551,10 @@ func (c *SignerClient) PlanRequestsWithContext(ctx context.Context, requests []S
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/plan", bytes.NewBuffer(jsonBody))
+	reqCtx, cancel := c.requestContext(ctx, groupPlanTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, "POST", c.baseURL+"/plan", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, err
 	}
@@ -644,7 +751,12 @@ func (c *SignerClient) SignRequestsWithContext(ctx context.Context, requests []S
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/sign", bytes.NewBuffer(jsonBody))
+	c.discoverApprovalWait(ctx)
+
+	reqCtx, cancel := c.requestContext(ctx, c.signRequestTimeout())
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, "POST", c.baseURL+"/sign", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -714,7 +826,13 @@ func (c *SignerClient) signResponse(requests []SignRequest) (*GroupSignResponse,
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", c.baseURL+"/sign", bytes.NewBuffer(jsonBody))
+	ctx := context.Background()
+	c.discoverApprovalWait(ctx)
+
+	reqCtx, cancel := c.requestContext(ctx, c.signRequestTimeout())
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, "POST", c.baseURL+"/sign", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

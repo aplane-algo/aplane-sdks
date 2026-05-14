@@ -67,7 +67,7 @@ class TestHealth:
         client = make_client()
         with patch.object(client.session, "get", return_value=mock_response(200)) as mock_get:
             assert client.health() is True
-        assert mock_get.call_args.kwargs["timeout"] == 10
+        assert mock_get.call_args.kwargs["timeout"] == 3
 
 
 # ---------------------------------------------------------------------------
@@ -458,6 +458,28 @@ class TestSigningErrors:
              patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             with pytest.raises(KeyNotFoundError):
                 client.sign_transaction(self._make_mock_txn())
+
+    def test_uses_discovered_approval_wait_plus_slack(self):
+        client = SignerClient("http://localhost:11270", "test-token")
+        client._cache_approval_wait(120)
+
+        assert client._sign_request_timeout() == 150
+
+    def test_falls_back_for_invalid_approval_wait(self):
+        client = SignerClient("http://localhost:11270", "test-token")
+        client._cache_approval_wait(31 * 60)
+
+        assert client._sign_request_timeout() == 360
+
+    def test_identity_discovery_failure_does_not_fail_sign(self):
+        client = make_client()
+        resp = mock_response(200, {"signed": ["deadbeef"]})
+        with patch.object(client, "get_identity", side_effect=SignerUnavailableError("down")), \
+             patch.object(client.session, "post", return_value=resp), \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            signed = client.sign_transaction(self._make_mock_txn())
+
+        assert base64.b64decode(signed) == bytes.fromhex("deadbeef")
 
     def test_timeout(self):
         import requests

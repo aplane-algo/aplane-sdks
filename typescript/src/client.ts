@@ -47,8 +47,15 @@ import {
   DEFAULT_SSH_PORT,
 } from "./config.js";
 
-/** Default request timeout in milliseconds (90s for operator approval wait) */
-const DEFAULT_TIMEOUT = 90000;
+const HEALTH_TIMEOUT = 3000;
+const IDENTITY_TIMEOUT = 5000;
+const INVENTORY_TIMEOUT = 30000;
+const MUTATION_TIMEOUT = 60000;
+const GROUP_PLAN_TIMEOUT = 60000;
+const SIGN_APPROVAL_SLACK = 30000;
+const DEFAULT_SIGN_REQUEST_TIMEOUT = 360000;
+const MAX_DISCOVERED_APPROVAL_WAIT = 1800000;
+const APPROVAL_WAIT_REFRESH = 300000;
 
 /**
  * Find an available local port.
@@ -273,9 +280,12 @@ class SSHTunnel {
 export class SignerClient {
   private baseUrl: string;
   private token: string;
-  private timeout: number;
+  private explicitTimeout?: number;
   private keyCache: Map<string, KeyInfo> = new Map();
   private tunnel: SSHTunnel | null = null;
+  private approvalWaitSeconds?: number;
+  private approvalWaitFetchedAt?: number;
+  private approvalWaitKnown = false;
 
   /**
    * Create a SignerClient instance.
@@ -287,12 +297,12 @@ export class SignerClient {
   constructor(
     baseUrl: string,
     token: string,
-    timeout: number = DEFAULT_TIMEOUT,
+    timeout?: number,
     tunnel: SSHTunnel | null = null
   ) {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.token = token;
-    this.timeout = timeout;
+    this.explicitTimeout = timeout && timeout > 0 ? timeout : undefined;
     this.tunnel = tunnel;
   }
 
@@ -332,7 +342,7 @@ export class SignerClient {
   ): Promise<SignerClient> {
     const sshPort = options.sshPort ?? DEFAULT_SSH_PORT;
     const signerPort = options.signerPort ?? DEFAULT_SIGNER_PORT;
-    const timeout = options.timeout ?? DEFAULT_TIMEOUT;
+    const timeout = options.timeout;
     const knownHostsPath = options.knownHostsPath ?? "";
     if (!knownHostsPath) {
       throw new SignerError("known_hosts path is required");
@@ -410,7 +420,7 @@ export class SignerClient {
    */
   static async fromEnv(options: FromEnvOptions = {}): Promise<SignerClient> {
     const dataDir = resolveDataDir(options.dataDir);
-    const timeout = options.timeout ?? DEFAULT_TIMEOUT;
+    const timeout = options.timeout;
 
     // Load config from data_dir/config.yaml
     const config = loadConfig(dataDir);
@@ -465,7 +475,7 @@ export class SignerClient {
     try {
       const response = await this.fetch("/health", {
         method: "GET",
-        timeout: 5000, // 5s for health checks
+        timeout: this.timeoutFor(HEALTH_TIMEOUT),
       });
       return response.status === 200;
     } catch {
@@ -482,7 +492,7 @@ export class SignerClient {
   async getIdentity(): Promise<IdentityResponse> {
     const response = await this.fetch("/identity", {
       method: "GET",
-      timeout: 5000,
+      timeout: this.timeoutFor(IDENTITY_TIMEOUT),
     });
 
     if (response.status === 401) {
@@ -506,7 +516,57 @@ export class SignerClient {
       approvalWaitSeconds:
         typeof data.approval_wait_seconds === "number" ? data.approval_wait_seconds : undefined,
     };
+    this.cacheApprovalWait(identity.approvalWaitSeconds);
     return identity;
+  }
+
+  private cacheApprovalWait(seconds?: number): void {
+    this.approvalWaitSeconds =
+      seconds && seconds > 0 && seconds <= MAX_DISCOVERED_APPROVAL_WAIT / 1000
+        ? seconds
+        : undefined;
+    this.approvalWaitFetchedAt = Date.now();
+    this.approvalWaitKnown = true;
+  }
+
+  private cachedApprovalWait(now: number = Date.now()): number | undefined {
+    if (!this.approvalWaitKnown || !this.approvalWaitSeconds || !this.approvalWaitFetchedAt) {
+      return undefined;
+    }
+    if (now - this.approvalWaitFetchedAt > APPROVAL_WAIT_REFRESH) {
+      return undefined;
+    }
+    return this.approvalWaitSeconds * 1000;
+  }
+
+  private needsApprovalWaitDiscovery(now: number = Date.now()): boolean {
+    if (!this.approvalWaitKnown || !this.approvalWaitFetchedAt) {
+      return true;
+    }
+    return now - this.approvalWaitFetchedAt > APPROVAL_WAIT_REFRESH;
+  }
+
+  private async discoverApprovalWait(): Promise<void> {
+    if (!this.needsApprovalWaitDiscovery()) {
+      return;
+    }
+    try {
+      await this.getIdentity();
+    } catch {
+      // /identity discovery failure must not fail /sign; use fallback timeout.
+    }
+  }
+
+  private signRequestTimeout(): number {
+    const wait = this.cachedApprovalWait();
+    return this.timeoutFor(wait ? wait + SIGN_APPROVAL_SLACK : DEFAULT_SIGN_REQUEST_TIMEOUT);
+  }
+
+  private timeoutFor(defaultTimeout: number): number {
+    if (this.explicitTimeout && this.explicitTimeout < defaultTimeout) {
+      return this.explicitTimeout;
+    }
+    return defaultTimeout;
   }
 
   /**
@@ -520,7 +580,10 @@ export class SignerClient {
       return Array.from(this.keyCache.values());
     }
 
-    const response = await this.fetch("/keys", { method: "GET", timeout: 10000 });
+    const response = await this.fetch("/keys", {
+      method: "GET",
+      timeout: this.timeoutFor(INVENTORY_TIMEOUT),
+    });
 
     if (response.status === 401) {
       throw new AuthenticationError();
@@ -589,7 +652,10 @@ export class SignerClient {
    * @returns List of KeyTypeInfo describing each available key type
    */
   async listKeyTypes(): Promise<KeyTypeInfo[]> {
-    const response = await this.fetch("/keytypes", { method: "GET", timeout: 10000 });
+    const response = await this.fetch("/keytypes", {
+      method: "GET",
+      timeout: this.timeoutFor(INVENTORY_TIMEOUT),
+    });
 
     if (response.status === 401) {
       throw new AuthenticationError();
@@ -673,7 +739,7 @@ export class SignerClient {
     const response = await this.fetch("/admin/generate", {
       method: "POST",
       body: JSON.stringify(body),
-      timeout: 30000,
+      timeout: this.timeoutFor(MUTATION_TIMEOUT),
     });
 
     if (response.status === 401) {
@@ -713,7 +779,7 @@ export class SignerClient {
   async deleteKey(address: string): Promise<void> {
     const response = await this.fetch(`/admin/keys?address=${encodeURIComponent(address)}`, {
       method: "DELETE",
-      timeout: 10000,
+      timeout: this.timeoutFor(MUTATION_TIMEOUT),
     });
 
     if (response.status === 401) {
@@ -775,6 +841,7 @@ export class SignerClient {
     const response = await this.fetch("/plan", {
       method: "POST",
       body: JSON.stringify(requestBody),
+      timeout: this.timeoutFor(GROUP_PLAN_TIMEOUT),
     });
 
     if (response.status === 401) {
@@ -1072,9 +1139,12 @@ export class SignerClient {
       txns, authAddresses, lsigArgsMap, passthrough, lsigSizes, false,
     );
 
+    await this.discoverApprovalWait();
+
     const response = await this.fetch("/sign", {
       method: "POST",
       body: JSON.stringify(requestBody),
+      timeout: this.signRequestTimeout(),
     });
 
     // Handle errors
@@ -1151,7 +1221,7 @@ export class SignerClient {
     }
   ): Promise<Response> {
     const url = this.baseUrl + path;
-    const timeout = options.timeout ?? this.timeout;
+    const timeout = options.timeout ?? this.timeoutFor(INVENTORY_TIMEOUT);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);

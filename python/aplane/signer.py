@@ -42,6 +42,7 @@ import os
 import re
 import requests
 import socket
+import time
 from dataclasses import dataclass
 from typing import Optional, Dict, List, Any
 
@@ -57,6 +58,15 @@ import paramiko
 # Default ports (match apshell/apsigner defaults)
 DEFAULT_SSH_PORT = 1127
 DEFAULT_SIGNER_PORT = 11270
+HEALTH_TIMEOUT = 3
+IDENTITY_TIMEOUT = 5
+INVENTORY_TIMEOUT = 30
+MUTATION_TIMEOUT = 60
+GROUP_PLAN_TIMEOUT = 60
+SIGN_APPROVAL_SLACK = 30
+DEFAULT_SIGN_REQUEST_TIMEOUT = 360
+MAX_DISCOVERED_APPROVAL_WAIT = 30 * 60
+APPROVAL_WAIT_REFRESH = 5 * 60
 
 # Current product identity for token provisioning helpers.
 DEFAULT_PRODUCT_IDENTITY = "default"
@@ -547,7 +557,7 @@ class SignerClient:
         self,
         base_url: str,
         token: str,
-        timeout: int = 90,
+        timeout: Optional[int] = None,
         tunnel: Optional[Any] = None
     ):
         """
@@ -556,7 +566,8 @@ class SignerClient:
         Args:
             base_url: Internal HTTP endpoint (set automatically by class methods)
             token: Authentication token (from aplane.token)
-            timeout: Request timeout in seconds (default 90 for operator approval)
+            timeout: Optional explicit request timeout in seconds. If omitted,
+                endpoint-specific defaults are used.
             tunnel: SSH tunnel instance (managed internally)
         """
         if not base_url:
@@ -565,12 +576,14 @@ class SignerClient:
             raise SignerError("token is required")
         self.base_url = base_url.rstrip("/")
         self.token = token
-        self.timeout = timeout
+        self.timeout = timeout if timeout and timeout > 0 else None
         self.session = requests.Session()
         self.session.headers["Authorization"] = f"aplane {token}"
         self._tunnel = tunnel
         self._key_cache: Dict[str, KeyInfo] = {}  # Cache key info by address
         self._approval_wait_seconds: Optional[int] = None
+        self._approval_wait_fetched_at: Optional[float] = None
+        self._approval_wait_known = False
 
     @classmethod
     def connect_ssh(
@@ -580,7 +593,7 @@ class SignerClient:
         ssh_key_path: str,
         ssh_port: int = DEFAULT_SSH_PORT,
         signer_port: int = DEFAULT_SIGNER_PORT,
-        timeout: int = 90,
+        timeout: Optional[int] = None,
         known_hosts_path: str = "",
         trust_on_first_use: bool = False,
     ) -> "SignerClient":
@@ -597,7 +610,7 @@ class SignerClient:
             ssh_key_path: Path to SSH private key (e.g., ~/.ssh/id_ed25519)
             ssh_port: SSH port on remote (default: 1127)
             signer_port: Signer REST port on remote (default: 11270)
-            timeout: Request timeout in seconds
+            timeout: Optional explicit request timeout in seconds
             known_hosts_path: Path to known_hosts file for host key verification (required)
             trust_on_first_use: If true, auto-trust unknown host keys (default: false)
 
@@ -650,7 +663,7 @@ class SignerClient:
     def from_env(
         cls,
         data_dir: Optional[str] = None,
-        timeout: int = 90
+        timeout: Optional[int] = None
     ) -> "SignerClient":
         """
         Connect using config file from data directory.
@@ -663,7 +676,7 @@ class SignerClient:
         Args:
             data_dir: Client data directory. Required unless APCLIENT_DATA
                 environment variable is set.
-            timeout: Request timeout in seconds
+            timeout: Optional explicit request timeout in seconds
 
         Returns:
             SignerClient instance
@@ -734,12 +747,17 @@ class SignerClient:
         self.close()
         return False
 
+    def _timeout_for(self, default_timeout: int) -> int:
+        if self.timeout and self.timeout < default_timeout:
+            return self.timeout
+        return default_timeout
+
     def health(self) -> bool:
         """Check if signer is healthy and reachable."""
         try:
             resp = self.session.get(
                 f"{self.base_url}/health",
-                timeout=self.timeout
+                timeout=self._timeout_for(HEALTH_TIMEOUT)
             )
             return resp.status_code == 200
         except requests.RequestException:
@@ -755,7 +773,7 @@ class SignerClient:
         try:
             resp = self.session.get(
                 f"{self.base_url}/identity",
-                timeout=5
+                timeout=self._timeout_for(IDENTITY_TIMEOUT)
             )
         except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
@@ -783,7 +801,47 @@ class SignerClient:
         return identity
 
     def _cache_approval_wait(self, seconds: int) -> None:
-        self._approval_wait_seconds = seconds
+        self._approval_wait_seconds = (
+            seconds
+            if seconds > 0 and seconds <= MAX_DISCOVERED_APPROVAL_WAIT
+            else None
+        )
+        self._approval_wait_fetched_at = time.monotonic()
+        self._approval_wait_known = True
+
+    def _cached_approval_wait(self) -> Optional[int]:
+        if (
+            not self._approval_wait_known
+            or not self._approval_wait_seconds
+            or self._approval_wait_fetched_at is None
+        ):
+            return None
+        if time.monotonic() - self._approval_wait_fetched_at > APPROVAL_WAIT_REFRESH:
+            return None
+        return self._approval_wait_seconds
+
+    def _needs_approval_wait_discovery(self) -> bool:
+        if not self._approval_wait_known or self._approval_wait_fetched_at is None:
+            return True
+        return time.monotonic() - self._approval_wait_fetched_at > APPROVAL_WAIT_REFRESH
+
+    def _discover_approval_wait(self) -> None:
+        if not self._needs_approval_wait_discovery():
+            return
+        try:
+            self.get_identity()
+        except SignerError:
+            # /identity discovery failure must not fail /sign; use fallback.
+            pass
+
+    def _sign_request_timeout(self) -> int:
+        wait = self._cached_approval_wait()
+        default = (
+            wait + SIGN_APPROVAL_SLACK
+            if wait is not None
+            else DEFAULT_SIGN_REQUEST_TIMEOUT
+        )
+        return self._timeout_for(default)
 
     def list_keys(self, refresh: bool = False) -> List[KeyInfo]:
         """
@@ -801,7 +859,7 @@ class SignerClient:
         try:
             resp = self.session.get(
                 f"{self.base_url}/keys",
-                timeout=self.timeout
+                timeout=self._timeout_for(INVENTORY_TIMEOUT)
             )
         except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
@@ -870,7 +928,7 @@ class SignerClient:
         try:
             resp = self.session.get(
                 f"{self.base_url}/keytypes",
-                timeout=self.timeout
+                timeout=self._timeout_for(INVENTORY_TIMEOUT)
             )
         except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
@@ -957,7 +1015,7 @@ class SignerClient:
             resp = self.session.post(
                 f"{self.base_url}/admin/generate",
                 json=body,
-                timeout=self.timeout
+                timeout=self._timeout_for(MUTATION_TIMEOUT)
             )
         except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
@@ -1004,7 +1062,7 @@ class SignerClient:
             resp = self.session.delete(
                 f"{self.base_url}/admin/keys",
                 params={"address": address},
-                timeout=self.timeout
+                timeout=self._timeout_for(MUTATION_TIMEOUT)
             )
         except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
@@ -1199,11 +1257,13 @@ class SignerClient:
             txns, auth_addresses, lsig_args_map, passthrough, lsig_sizes, False
         )
 
+        self._discover_approval_wait()
+
         try:
             resp = self.session.post(
                 f"{self.base_url}/sign",
                 json=request_body,
-                timeout=self.timeout
+                timeout=self._sign_request_timeout()
             )
         except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
@@ -1312,7 +1372,7 @@ class SignerClient:
             resp = self.session.post(
                 f"{self.base_url}/plan",
                 json=request_body,
-                timeout=self.timeout
+                timeout=self._timeout_for(GROUP_PLAN_TIMEOUT)
             )
         except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")

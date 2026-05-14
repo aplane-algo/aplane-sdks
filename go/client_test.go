@@ -4,6 +4,7 @@
 package aplane
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -353,6 +354,80 @@ func TestGetIdentity_AuthError(t *testing.T) {
 	_, err := client.GetIdentity()
 	if err != ErrAuthentication {
 		t.Fatalf("expected ErrAuthentication, got: %v", err)
+	}
+}
+
+func TestSignRequestTimeoutUsesApprovalWaitSlack(t *testing.T) {
+	client := NewSignerClientWithToken("http://example.invalid", "test")
+	client.cacheApprovalWait(120)
+
+	if got := client.signRequestTimeout(); got != 150*time.Second {
+		t.Fatalf("signRequestTimeout = %s, want 150s", got)
+	}
+}
+
+func TestSignRequestTimeoutFallsBackForInvalidApprovalWait(t *testing.T) {
+	client := NewSignerClientWithToken("http://example.invalid", "test")
+	client.cacheApprovalWait(int64((31 * time.Minute) / time.Second))
+
+	if got := client.signRequestTimeout(); got != defaultSignRequestTimeout {
+		t.Fatalf("signRequestTimeout = %s, want %s", got, defaultSignRequestTimeout)
+	}
+}
+
+func TestSignRequestsDiscoversApprovalWaitBeforeSigning(t *testing.T) {
+	var paths []string
+	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		switch r.URL.Path {
+		case "/identity":
+			json.NewEncoder(w).Encode(IdentityResponse{
+				IdentityID:          "default",
+				State:               "unlocked",
+				ApprovalWaitSeconds: 60,
+			})
+		case "/sign":
+			json.NewEncoder(w).Encode(GroupSignResponse{Signed: []string{"deadbeef"}})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+	defer server.Close()
+
+	_, err := client.SignRequestsWithContext(context.Background(), []SignRequest{
+		{AuthAddress: "AUTH", TxnBytesHex: "545801"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := strings.Join(paths, ","); got != "/identity,/sign" {
+		t.Fatalf("paths = %s, want /identity,/sign", got)
+	}
+}
+
+func TestSignRequestsIdentityFailureFallsBackToSign(t *testing.T) {
+	var paths []string
+	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		switch r.URL.Path {
+		case "/identity":
+			w.WriteHeader(http.StatusServiceUnavailable)
+		case "/sign":
+			json.NewEncoder(w).Encode(GroupSignResponse{Signed: []string{"deadbeef"}})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+	defer server.Close()
+
+	_, err := client.SignRequestsWithContext(context.Background(), []SignRequest{
+		{AuthAddress: "AUTH", TxnBytesHex: "545801"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := strings.Join(paths, ","); got != "/identity,/sign" {
+		t.Fatalf("paths = %s, want /identity,/sign", got)
 	}
 }
 
