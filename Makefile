@@ -14,13 +14,16 @@ typescript-test:
 integration-test: go-integration-test python-integration-test typescript-integration-test
 
 go-integration-test:
-	cd go && APLANE_SDK_INTEGRATION=1 go test -run Integration -count=1 ./...
+	@echo "Running Go SDK integration tests..."
+	@cd go && APLANE_SDK_INTEGRATION=1 go test -run Integration -count=1 ./...
 
 python-integration-test:
-	cd python && APLANE_SDK_INTEGRATION=1 pytest -v tests/test_integration.py
+	@echo "Running Python SDK integration tests..."
+	@cd python && APLANE_SDK_INTEGRATION=1 pytest -q tests/test_integration.py
 
 typescript-integration-test:
-	cd typescript && APLANE_SDK_INTEGRATION=1 node --import tsx --test integration/live_signer.test.ts
+	@echo "Running TypeScript SDK integration tests..."
+	@cd typescript && APLANE_SDK_INTEGRATION=1 node --import tsx --test --test-reporter=dot integration/live_signer.test.ts
 
 clean:
 	rm -rf python/.pytest_cache python/build python/dist python/*.egg-info
