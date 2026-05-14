@@ -21,6 +21,7 @@ EXPECTED_FIXTURE_NAMES = [
     "group_sign_request_mixed.json",
     "group_sign_response_mutated.json",
     "health_response_ready.json",
+    "identity_response_ready.json",
     "keys_response_generic.json",
     "keytypes_response_full.json",
 ]
