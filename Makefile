@@ -27,6 +27,7 @@ python-integration-test:
 typescript-integration-test:
 	@echo "Running TypeScript SDK integration tests..."
 	@cd typescript && APLANE_SDK_INTEGRATION=1 node --import tsx --test --test-reporter=dot integration/live_signer.test.ts
+	@echo "TypeScript SDK integration tests passed"
 
 clean:
 	rm -rf python/.pytest_cache python/build python/dist python/*.egg-info
