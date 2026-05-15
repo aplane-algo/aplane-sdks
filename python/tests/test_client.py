@@ -24,6 +24,7 @@ from aplane.signer import (
     ClientConfig,
     request_token,
     request_token_to_file,
+    _validate_sign_request_id,
 )
 
 
@@ -489,6 +490,46 @@ class TestSigningErrors:
             with pytest.raises(SignerUnavailableError):
                 client.sign_transaction(self._make_mock_txn())
 
+    def test_timeout_sends_best_effort_cancel(self):
+        import requests
+        client = make_client()
+        cancel_resp = mock_response(200, {"success": True, "state": "canceled"})
+        with patch.object(client.session, "post", side_effect=[
+            requests.Timeout("timed out"),
+            cancel_resp,
+        ]) as mock_post, \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")), \
+             patch("aplane.signer._new_sign_request_id", return_value="sdk-test"):
+            with pytest.raises(SignerUnavailableError):
+                client.sign_transaction(self._make_mock_txn())
+
+        assert mock_post.call_args_list[0].args[0] == "http://localhost:11270/sign"
+        assert mock_post.call_args_list[0].kwargs["json"]["request_id"] == "sdk-test"
+        assert mock_post.call_args_list[1].args[0] == "http://localhost:11270/sign/cancel"
+        assert mock_post.call_args_list[1].kwargs["json"] == {"request_id": "sdk-test"}
+
+
+class TestCancelSignRequest:
+    def test_cancel_sign_request_returns_state(self):
+        client = make_client()
+        resp = mock_response(200, {"success": True, "state": "not_found"})
+
+        with patch.object(client.session, "post", return_value=resp) as mock_post:
+            result = client.cancel_sign_request("sdk-test")
+
+        assert result.success is True
+        assert result.state == "not_found"
+        assert mock_post.call_args.args[0] == "http://localhost:11270/sign/cancel"
+        assert mock_post.call_args.kwargs["json"] == {"request_id": "sdk-test"}
+        assert mock_post.call_args.kwargs["timeout"] == 5
+
+    def test_cancel_sign_request_validates_id(self):
+        client = make_client()
+        with pytest.raises(ValueError, match="request_id is required"):
+            client.cancel_sign_request("")
+        with pytest.raises(ValueError, match="invalid character"):
+            _validate_sign_request_id("bad id", required=True)
+
 
 # ---------------------------------------------------------------------------
 # sign_transactions with foreign entries
@@ -542,6 +583,7 @@ class TestBuildSignRequests:
 
         call_kwargs = mock_post.call_args
         body = call_kwargs[1]["json"]
+        assert body["request_id"]
         assert len(body["requests"]) == 1
         assert body["requests"][0]["auth_address"] == "AUTH_ADDR"
         assert body["requests"][0]["txn_bytes_hex"] == "deadbeef"

@@ -41,6 +41,7 @@ import json
 import os
 import re
 import requests
+import secrets
 import socket
 import time
 from dataclasses import dataclass
@@ -63,10 +64,12 @@ STATUS_TIMEOUT = 5
 INVENTORY_TIMEOUT = 30
 MUTATION_TIMEOUT = 60
 GROUP_PLAN_TIMEOUT = 60
+SIGN_CANCEL_TIMEOUT = 5
 SIGN_APPROVAL_SLACK = 30
 DEFAULT_SIGN_REQUEST_TIMEOUT = 360
 MAX_DISCOVERED_APPROVAL_WAIT = 30 * 60
 APPROVAL_WAIT_REFRESH = 5 * 60
+MAX_SIGN_REQUEST_ID_LENGTH = 128
 
 # Current product identity for token provisioning helpers.
 DEFAULT_PRODUCT_IDENTITY = "default"
@@ -247,6 +250,14 @@ class StatusResponse:
 
 
 @dataclass
+class CancelSignResponse:
+    """Response from /sign/cancel"""
+    success: bool
+    state: str = ""
+    error: str = ""
+
+
+@dataclass
 class GenerateResult:
     """Result of key generation"""
     address: str
@@ -316,6 +327,23 @@ def encode_transaction(txn: transaction.Transaction) -> tuple:
     txn_bytes = b"TX" + base64.b64decode(msgpack_b64)
 
     return txn_bytes.hex(), txn.sender
+
+
+def _new_sign_request_id() -> str:
+    return f"sdk-{secrets.token_hex(16)}"
+
+
+def _validate_sign_request_id(request_id: str, *, required: bool = False) -> None:
+    if not request_id:
+        if required:
+            raise ValueError("request_id is required")
+        return
+    if len(request_id) > MAX_SIGN_REQUEST_ID_LENGTH:
+        raise ValueError("request_id is too long")
+    for ch in request_id:
+        if ch.isalnum() or ch in "-_.:":
+            continue
+        raise ValueError(f"request_id contains invalid character {ch!r}")
 
 
 # -----------------------------------------------------------------------------
@@ -1106,6 +1134,48 @@ class SignerClient:
         except json.JSONDecodeError:
             return {}
 
+    def cancel_sign_request(self, request_id: str) -> CancelSignResponse:
+        """
+        Ask apsigner to cancel a live synchronous /sign request.
+
+        Cancellation is idempotent for client behavior. A successful HTTP
+        response returns state "canceled" or "not_found".
+        """
+        _validate_sign_request_id(request_id, required=True)
+        try:
+            resp = self.session.post(
+                f"{self.base_url}/sign/cancel",
+                json={"request_id": request_id},
+                timeout=self._timeout_for(SIGN_CANCEL_TIMEOUT),
+            )
+        except requests.RequestException as e:
+            raise SignerUnavailableError(f"Failed to connect: {e}")
+
+        if resp.status_code == 401:
+            raise AuthenticationError("Invalid or missing token")
+
+        if resp.status_code != 200:
+            data = self._safe_json(resp)
+            raise SignerError(
+                data.get("error", f"Sign cancel failed: HTTP {resp.status_code}")
+            )
+
+        data = self._safe_json(resp)
+        result = CancelSignResponse(
+            success=data.get("success", False),
+            state=data.get("state", ""),
+            error=data.get("error", ""),
+        )
+        if result.error:
+            raise SignerError(result.error)
+        return result
+
+    def _best_effort_cancel_sign_request(self, request_id: str) -> None:
+        try:
+            self.cancel_sign_request(request_id)
+        except Exception:
+            pass
+
     def _build_sign_request_body(
         self,
         txns: List[Optional[transaction.Transaction]],
@@ -1256,6 +1326,8 @@ class SignerClient:
         request_body = self._build_sign_request_body(
             txns, auth_addresses, lsig_args_map, passthrough, lsig_sizes, False
         )
+        request_id = _new_sign_request_id()
+        request_body["request_id"] = request_id
 
         self._discover_approval_wait()
 
@@ -1266,6 +1338,7 @@ class SignerClient:
                 timeout=self._sign_request_timeout()
             )
         except requests.RequestException as e:
+            self._best_effort_cancel_sign_request(request_id)
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         # Handle errors

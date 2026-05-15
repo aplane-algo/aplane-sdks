@@ -8,7 +8,7 @@ import base64
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from aplane.signer import SignerClient, StatusResponse
+from aplane.signer import CancelSignResponse, SignerClient, StatusResponse
 
 
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "contracts" / "signerapi"
@@ -141,6 +141,14 @@ def test_status_fixture_maps_metadata():
     assert identity.key_count == 37
     assert identity.keyset_revision == 4
     assert identity.approval_wait_seconds == 60
+
+
+def test_cancel_response_fixture_maps_state():
+    data = fixture("cancel_sign_response_success.json")
+    result = CancelSignResponse(**data)
+
+    assert result.success is True
+    assert result.state == "canceled"
 
 
 def test_list_keys_maps_template_warning_fields():
