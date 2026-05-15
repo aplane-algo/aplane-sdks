@@ -79,6 +79,7 @@ export type {
   ConnectSshOptions,
   LsigArgs,
   LsigArgsMap,
+  SignOptions,
   MutationReport,
   PlanGroupResponse,
   CancelSignRequest,

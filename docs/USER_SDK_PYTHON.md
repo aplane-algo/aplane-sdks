@@ -233,14 +233,22 @@ and convenience flow remains the SSH-backed path shown above. An explicit
 timeout shorter than the signer approval wait will cancel queued/pending manual
 approval; SDK `/sign` calls include a `request_id` and send a best-effort
 `/sign/cancel` when the HTTP request times out or disconnects.
+High-level signing methods accept an optional keyword-only `request_id` for
+applications that need user-initiated cancellation from another thread.
 
 `cancel_sign_request(request_id)` exposes explicit synchronous sign-request
 cancellation for advanced callers that already know a request ID.
 
-Python high-level signing currently generates its request ID internally and
-does not expose a cancel handle. It cleans up on local timeout/disconnect; true
-user-initiated cancellation requires an application-owned request ID plus
-`cancel_sign_request()`, or a future cancelable high-level signing API.
+Python high-level signing generates a request ID by default. Interactive
+applications can pass an application-owned ID, then call
+`cancel_sign_request()` with the same value from another thread:
+
+```python
+request_id = "wallet-ui-approval-123"
+signed = client.sign_transaction(txn, request_id=request_id)
+# elsewhere, if the user aborts while approval is pending:
+client.cancel_sign_request(request_id)
+```
 
 ## Common Tasks
 

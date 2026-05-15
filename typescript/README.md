@@ -262,6 +262,8 @@ plus 30 seconds of slack for the request timeout. If discovery fails or an older
 signer omits the field, signing falls back to 6 minutes. An explicit shorter
 timeout still wins; SDK `/sign` calls include a `request_id` and send a
 best-effort `/sign/cancel` when the HTTP request times out or disconnects.
+High-level signing methods accept `requestId` and `signal` options for
+applications that need user-initiated cancellation.
 
 #### `cancelSignRequest(requestId): Promise<CancelSignResponse>`
 
@@ -269,12 +271,22 @@ Ask apsigner to cancel a live synchronous `/sign` request by request ID.
 Successful responses are idempotent for client behavior and return state
 `"canceled"` or `"not_found"`.
 
-TypeScript high-level signing currently generates the request ID internally and
-does not expose a cancel handle to callers. The SDK sends best-effort
-`/sign/cancel` on local timeout/disconnect paths; interactive applications that
-need user-initiated cancel should use an application-owned request ID and call
-`cancelSignRequest()` directly, or wait for a future cancelable high-level
-signing API.
+TypeScript high-level signing generates a request ID by default. Interactive
+applications can pass an application-owned ID and an `AbortSignal`; aborting the
+signal aborts the HTTP request and sends best-effort `/sign/cancel` with the
+same ID:
+
+```typescript
+const controller = new AbortController();
+const requestId = "wallet-ui-approval-123";
+const signed = await client.signTransaction(txn, undefined, undefined, {
+  requestId,
+  signal: controller.signal,
+});
+
+// elsewhere, if the user aborts while approval is pending:
+controller.abort();
+```
 
 ## Supported Key Types
 

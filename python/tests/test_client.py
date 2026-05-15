@@ -508,6 +508,20 @@ class TestSigningErrors:
         assert mock_post.call_args_list[1].args[0] == "http://localhost:11270/sign/cancel"
         assert mock_post.call_args_list[1].kwargs["json"] == {"request_id": "sdk-test"}
 
+    def test_sign_transaction_accepts_caller_request_id(self):
+        client = make_client()
+        resp = mock_response(200, {"signed": ["deadbeef"]})
+        with patch.object(client.session, "post", return_value=resp) as mock_post, \
+             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+            client.sign_transaction(self._make_mock_txn(), request_id="app-owned-id")
+
+        assert mock_post.call_args.kwargs["json"]["request_id"] == "app-owned-id"
+
+    def test_sign_transaction_validates_caller_request_id(self):
+        client = make_client()
+        with pytest.raises(ValueError, match="invalid character"):
+            client.sign_transaction(self._make_mock_txn(), request_id="bad id")
+
 
 class TestCancelSignRequest:
     def test_cancel_sign_request_returns_state(self):

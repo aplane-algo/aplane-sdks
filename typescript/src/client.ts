@@ -11,6 +11,7 @@ import type {
   KeyInfo,
   ConnectSshOptions,
   FromEnvOptions,
+  SignOptions,
   LsigArgs,
   LsigArgsMap,
   SignRequest,
@@ -992,12 +993,13 @@ export class SignerClient {
   async signTransaction(
     txn: Transaction,
     authAddress?: string,
-    lsigArgs?: LsigArgs
+    lsigArgs?: LsigArgs,
+    options?: SignOptions,
   ): Promise<string> {
     const auth = authAddress ?? txn.sender.toString();
     const lsigArgsMap = lsigArgs ? { [auth]: lsigArgs } : undefined;
 
-    const signedList = await this.signRequest([txn], [auth], lsigArgsMap);
+    const signedList = await this.signRequest([txn], [auth], lsigArgsMap, undefined, undefined, options);
 
     // Concatenate all signed txns and return as single base64 string
     return concatenateSignedTxns(signedList);
@@ -1028,6 +1030,7 @@ export class SignerClient {
     lsigArgsMap?: LsigArgsMap,
     passthrough?: Record<number, string>,
     lsigSizes?: Record<number, number>,
+    options?: SignOptions,
   ): Promise<string> {
     const authAddrs =
       authAddresses ?? txns.map((txn) => txn?.sender?.toString() ?? null);
@@ -1037,7 +1040,7 @@ export class SignerClient {
     }
 
     const signedList = await this.signRequest(
-      txns, authAddrs, lsigArgsMap, passthrough, lsigSizes,
+      txns, authAddrs, lsigArgsMap, passthrough, lsigSizes, options,
     );
 
     // Reject if any foreign (empty) slots exist
@@ -1073,6 +1076,7 @@ export class SignerClient {
     lsigArgsMap?: LsigArgsMap,
     passthrough?: Record<number, string>,
     lsigSizes?: Record<number, number>,
+    options?: SignOptions,
   ): Promise<string[]> {
     const authAddrs =
       authAddresses ?? txns.map((txn) => txn?.sender?.toString() ?? null);
@@ -1082,7 +1086,7 @@ export class SignerClient {
     }
 
     const signedHexes = await this.signRequest(
-      txns, authAddrs, lsigArgsMap, passthrough, lsigSizes,
+      txns, authAddrs, lsigArgsMap, passthrough, lsigSizes, options,
     );
 
     // Convert each hex to base64 (empty strings stay empty for foreign entries)
@@ -1197,11 +1201,12 @@ export class SignerClient {
     lsigArgsMap?: LsigArgsMap,
     passthrough?: Record<number, string>,
     lsigSizes?: Record<number, number>,
+    options?: SignOptions,
   ): Promise<string[]> {
     const requestBody = this.buildSignRequestBody(
       txns, authAddresses, lsigArgsMap, passthrough, lsigSizes, false,
     );
-    const requestId = newSignRequestId();
+    const requestId = options?.requestId ?? newSignRequestId();
     validateSignRequestId(requestId, true);
     const signBody = { request_id: requestId, ...requestBody };
 
@@ -1213,6 +1218,7 @@ export class SignerClient {
         method: "POST",
         body: JSON.stringify(signBody),
         timeout: this.signRequestTimeout(),
+        signal: options?.signal,
       });
     } catch (error) {
       await this.bestEffortCancelSignRequest(requestId);
@@ -1290,6 +1296,7 @@ export class SignerClient {
       method: string;
       body?: string;
       timeout?: number;
+      signal?: AbortSignal;
     }
   ): Promise<Response> {
     const url = this.baseUrl + path;
@@ -1297,6 +1304,12 @@ export class SignerClient {
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const abortFromCaller = () => controller.abort();
+    if (options.signal?.aborted) {
+      controller.abort();
+    } else {
+      options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+    }
 
     try {
       const headers: Record<string, string> = {
@@ -1317,13 +1330,17 @@ export class SignerClient {
       return response;
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        throw new SignerUnavailableError(`Request timed out after ${timeout}ms`);
+        const msg = options.signal?.aborted
+          ? "Request aborted by caller"
+          : `Request timed out after ${timeout}ms`;
+        throw new SignerUnavailableError(msg);
       }
       throw new SignerUnavailableError(
         `Failed to connect: ${error instanceof Error ? error.message : String(error)}`
       );
     } finally {
       clearTimeout(timeoutId);
+      options.signal?.removeEventListener("abort", abortFromCaller);
     }
   }
 }

@@ -242,6 +242,8 @@ plus 30 seconds of slack for the request timeout. If discovery fails or an older
 signer omits the field, signing falls back to 6 minutes. An explicit shorter
 timeout still wins; SDK `/sign` calls include a `request_id` and send a
 best-effort `/sign/cancel` when the HTTP request times out or disconnects.
+High-level signing methods accept an optional keyword-only `request_id` for
+applications that need user-initiated cancellation from another thread.
 
 #### `cancel_sign_request(request_id) -> CancelSignResponse`
 
@@ -249,12 +251,16 @@ Ask apsigner to cancel a live synchronous `/sign` request by request ID.
 Successful responses are idempotent for client behavior and return state
 `"canceled"` or `"not_found"`.
 
-Python high-level signing currently generates the request ID internally and
-does not expose a cancel handle to callers. The SDK sends best-effort
-`/sign/cancel` on local timeout/disconnect paths; interactive applications that
-need user-initiated cancel should use an application-owned request ID and call
-`cancel_sign_request()` directly, or wait for a future cancelable high-level
-signing API.
+Python high-level signing generates a request ID by default. Interactive
+applications can pass an application-owned ID, then call
+`cancel_sign_request()` with the same value from another thread:
+
+```python
+request_id = "wallet-ui-approval-123"
+signed = client.sign_transaction(txn, request_id=request_id)
+# elsewhere, if the user aborts while approval is pending:
+client.cancel_sign_request(request_id)
+```
 
 #### `close()`
 

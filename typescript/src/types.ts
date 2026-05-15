@@ -95,6 +95,22 @@ export interface FromEnvOptions {
 }
 
 /**
+ * Options for high-level signing helpers.
+ */
+export interface SignOptions {
+  /**
+   * Optional caller-owned /sign request ID. Use the same ID with
+   * cancelSignRequest() to cancel a pending approval from another task.
+   */
+  requestId?: string;
+  /**
+   * Optional caller cancellation signal. Aborting the signal aborts the
+   * in-flight /sign request and sends a best-effort /sign/cancel.
+   */
+  signal?: AbortSignal;
+}
+
+/**
  * Parameter specification for key generation.
  */
 export interface CreationParam {

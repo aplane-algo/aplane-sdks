@@ -1288,6 +1288,7 @@ class SignerClient:
         lsig_args_map: Optional[Dict[str, Dict[str, bytes]]] = None,
         passthrough: Optional[Dict[int, str]] = None,
         lsig_sizes: Optional[Dict[int, int]] = None,
+        request_id: Optional[str] = None,
     ) -> List[str]:
         """
         Send signing request to the /sign endpoint.
@@ -1314,6 +1315,9 @@ class SignerClient:
                 [0, len(txns)).
             lsig_sizes: Optional mapping of group index -> LSig size hint
                 for planning foreign transactions.
+            request_id: Optional caller-owned /sign request ID. Applications
+                can use the same ID with cancel_sign_request() to cancel a
+                pending approval from another thread.
 
         Returns:
             List of base64-encoded signed transactions (includes any dummies
@@ -1326,7 +1330,9 @@ class SignerClient:
         request_body = self._build_sign_request_body(
             txns, auth_addresses, lsig_args_map, passthrough, lsig_sizes, False
         )
-        request_id = _new_sign_request_id()
+        if request_id is None:
+            request_id = _new_sign_request_id()
+        _validate_sign_request_id(request_id, required=True)
         request_body["request_id"] = request_id
 
         self._discover_approval_wait()
@@ -1482,6 +1488,8 @@ class SignerClient:
         txn: transaction.Transaction,
         auth_address: Optional[str] = None,
         lsig_args: Optional[Dict[str, bytes]] = None,
+        *,
+        request_id: Optional[str] = None,
     ) -> str:
         """
         Sign a transaction via apsigner.
@@ -1496,6 +1504,9 @@ class SignerClient:
             auth_address: Key to sign with (defaults to txn.sender)
             lsig_args: Optional runtime args for generic LogicSigs,
                        e.g., {"preimage": b"secret"}
+            request_id: Optional caller-owned /sign request ID. Use the same
+                ID with cancel_sign_request() to cancel a pending approval from
+                another thread.
 
         Returns:
             Base64-encoded signed transaction(s), ready for algod_client.send_raw_transaction().
@@ -1506,7 +1517,7 @@ class SignerClient:
 
         lsig_args_map = {auth_address: lsig_args} if lsig_args else None
 
-        signed_list = self._sign_request([txn], [auth_address], lsig_args_map)
+        signed_list = self._sign_request([txn], [auth_address], lsig_args_map, request_id=request_id)
 
         # Concatenate all signed txns and return as single base64 string
         all_bytes = b"".join(base64.b64decode(s) for s in signed_list)
@@ -1519,6 +1530,8 @@ class SignerClient:
         lsig_args_map: Optional[Dict[str, Dict[str, bytes]]] = None,
         passthrough: Optional[Dict[int, str]] = None,
         lsig_sizes: Optional[Dict[int, int]] = None,
+        *,
+        request_id: Optional[str] = None,
     ) -> str:
         """
         Sign multiple transactions as a group.
@@ -1552,6 +1565,9 @@ class SignerClient:
                 All indices must be in range [0, len(txns)).
             lsig_sizes: Optional mapping of group index -> LSig size hint
                 for planning foreign transactions.
+            request_id: Optional caller-owned /sign request ID. Use the same
+                ID with cancel_sign_request() to cancel a pending approval from
+                another thread.
 
         Returns:
             Base64-encoded concatenated signed transactions for the entire group,
@@ -1563,7 +1579,9 @@ class SignerClient:
         if len(auth_addresses) != len(txns):
             raise ValueError("auth_addresses length must match txns length")
 
-        signed_list = self._sign_request(txns, auth_addresses, lsig_args_map, passthrough, lsig_sizes)
+        signed_list = self._sign_request(
+            txns, auth_addresses, lsig_args_map, passthrough, lsig_sizes, request_id=request_id
+        )
 
         # Concatenate all signed txns and return as single base64 string
         all_bytes = b"".join(base64.b64decode(s) for s in signed_list)
@@ -1576,6 +1594,8 @@ class SignerClient:
         lsig_args_map: Optional[Dict[str, Dict[str, bytes]]] = None,
         passthrough: Optional[Dict[int, str]] = None,
         lsig_sizes: Optional[Dict[int, int]] = None,
+        *,
+        request_id: Optional[str] = None,
     ) -> List[str]:
         """
         Sign multiple transactions and return as a list.
@@ -1599,6 +1619,9 @@ class SignerClient:
                 All indices must be in range [0, len(txns)).
             lsig_sizes: Optional mapping of group index -> LSig size hint
                 for planning foreign transactions.
+            request_id: Optional caller-owned /sign request ID. Use the same
+                ID with cancel_sign_request() to cancel a pending approval from
+                another thread.
 
         Returns:
             List of base64-encoded signed transactions (includes any dummies).
@@ -1609,7 +1632,9 @@ class SignerClient:
         if len(auth_addresses) != len(txns):
             raise ValueError("auth_addresses length must match txns length")
 
-        return self._sign_request(txns, auth_addresses, lsig_args_map, passthrough, lsig_sizes)
+        return self._sign_request(
+            txns, auth_addresses, lsig_args_map, passthrough, lsig_sizes, request_id=request_id
+        )
 
 
 def assemble_group(signed_lists: List[List[str]]) -> str:

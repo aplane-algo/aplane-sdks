@@ -585,6 +585,91 @@ describe("SignerClient", () => {
       assert.equal(cancelBody.request_id, signBody.request_id);
     });
 
+    it("uses caller-supplied requestId for signing and cancel", async () => {
+      const abortError = new Error("Abort");
+      abortError.name = "AbortError";
+      queueStatusResponse();
+      mockFetch.mockRejectedValueOnce(abortError);
+      mockFetch.mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: true, state: "canceled" }),
+      });
+
+      const client = new SignerClient("http://localhost:11270", "test-token", 100);
+      const mockTxn = createMockTxn() as Parameters<typeof client.signTransaction>[0];
+
+      await assert.rejects(
+        client.signTransaction(mockTxn, undefined, undefined, { requestId: "app-owned-id" }),
+        SignerUnavailableError,
+      );
+
+      const signBody = JSON.parse(mockFetch.mock.calls[1][1].body);
+      const cancelBody = JSON.parse(mockFetch.mock.calls[2][1].body);
+      assert.equal(signBody.request_id, "app-owned-id");
+      assert.equal(cancelBody.request_id, "app-owned-id");
+    });
+
+    it("sends best-effort cancel when caller AbortSignal aborts signing", async () => {
+      const previousFetch = globalThis.fetch;
+      const calls: any[][] = [];
+      const controller = new AbortController();
+      const abortError = new Error("Abort");
+      abortError.name = "AbortError";
+
+      globalThis.fetch = (async (url: string, options: any) => {
+        calls.push([url, options]);
+        if (url.endsWith("/status")) {
+          return {
+            status: 200,
+            ok: true,
+            json: async () => ({
+              identity_id: "default",
+              state: "unlocked",
+              signer_locked: false,
+              ready_for_signing: true,
+              key_count: 37,
+              keyset_revision: 4,
+              approval_wait_seconds: 60,
+            }),
+          } as Response;
+        }
+        if (url.endsWith("/sign")) {
+          if (options.signal.aborted) {
+            throw abortError;
+          }
+          await new Promise((_resolve, reject) => {
+            options.signal.addEventListener("abort", () => reject(abortError), { once: true });
+            controller.abort();
+          });
+        }
+        return {
+          status: 200,
+          ok: true,
+          json: async () => ({ success: true, state: "canceled" }),
+        } as Response;
+      }) as typeof fetch;
+
+      try {
+        const client = new SignerClient("http://localhost:11270", "test-token");
+        const mockTxn = createMockTxn() as Parameters<typeof client.signTransaction>[0];
+
+        await assert.rejects(
+          client.signTransaction(mockTxn, undefined, undefined, {
+            requestId: "abort-owned-id",
+            signal: controller.signal,
+          }),
+          SignerUnavailableError,
+        );
+      } finally {
+        globalThis.fetch = previousFetch;
+      }
+
+      assert.equal(calls[1][0], "http://localhost:11270/sign");
+      assert.equal(calls[2][0], "http://localhost:11270/sign/cancel");
+      assert.equal(JSON.parse(calls[2][1].body).request_id, "abort-owned-id");
+    });
+
     it("continues signing with fallback timeout when status discovery fails", async () => {
       mockFetch.mockResolvedValueOnce({
         status: 503,

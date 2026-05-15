@@ -242,14 +242,28 @@ constructor can be used directly. An explicit timeout shorter than the signer
 approval wait will cancel queued/pending manual approval; SDK `/sign` calls
 include a `request_id` and send a best-effort `/sign/cancel` when the HTTP
 request times out or disconnects.
+High-level signing methods accept `requestId` and `signal` options for
+applications that need user-initiated cancellation.
 
 `cancelSignRequest(requestId)` exposes explicit synchronous sign-request
 cancellation for advanced callers that already know a request ID.
 
-TypeScript high-level signing currently generates its request ID internally and
-does not expose a cancel handle. It cleans up on local timeout/disconnect; true
-user-initiated cancellation requires an application-owned request ID plus
-`cancelSignRequest()`, or a future cancelable high-level signing API.
+TypeScript high-level signing generates a request ID by default. Interactive
+applications can pass an application-owned ID and an `AbortSignal`; aborting the
+signal aborts the HTTP request and sends best-effort `/sign/cancel` with the
+same ID:
+
+```ts
+const controller = new AbortController();
+const requestId = "wallet-ui-approval-123";
+const signed = await client.signTransaction(txn, undefined, undefined, {
+  requestId,
+  signal: controller.signal,
+});
+
+// elsewhere, if the user aborts while approval is pending:
+controller.abort();
+```
 
 ## Common Tasks
 
