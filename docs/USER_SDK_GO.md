@@ -506,6 +506,9 @@ if err != nil {
   signer responds.
 - `CancelSignRequestWithContext(...)` exposes explicit synchronous sign-request
   cancellation for advanced callers that already know a request ID.
+- Go is the reference SDK shape for caller-initiated cancellation: pass a
+  cancelable context to the signing call and the SDK will best-effort cancel the
+  live signer request if that context ends before apsigner responds.
 - If you call `SetHTTPClient(...)` with a client-level timeout, that timeout is
   a hard cap and the SDK cannot extend it for long approval waits.
 - `known_hosts` verification is required for SSH unless you deliberately enable

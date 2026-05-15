@@ -269,6 +269,13 @@ Ask apsigner to cancel a live synchronous `/sign` request by request ID.
 Successful responses are idempotent for client behavior and return state
 `"canceled"` or `"not_found"`.
 
+TypeScript high-level signing currently generates the request ID internally and
+does not expose a cancel handle to callers. The SDK sends best-effort
+`/sign/cancel` on local timeout/disconnect paths; interactive applications that
+need user-initiated cancel should use an application-owned request ID and call
+`cancelSignRequest()` directly, or wait for a future cancelable high-level
+signing API.
+
 ## Supported Key Types
 
 | Key Type | Description | Notes |

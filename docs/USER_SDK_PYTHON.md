@@ -237,6 +237,11 @@ approval; SDK `/sign` calls include a `request_id` and send a best-effort
 `cancel_sign_request(request_id)` exposes explicit synchronous sign-request
 cancellation for advanced callers that already know a request ID.
 
+Python high-level signing currently generates its request ID internally and
+does not expose a cancel handle. It cleans up on local timeout/disconnect; true
+user-initiated cancellation requires an application-owned request ID plus
+`cancel_sign_request()`, or a future cancelable high-level signing API.
+
 ## Common Tasks
 
 ### Health Check

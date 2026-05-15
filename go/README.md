@@ -287,6 +287,12 @@ Ask apsigner to cancel a live synchronous `/sign` request by request ID.
 Successful responses are idempotent for client behavior and return state
 `"canceled"` or `"not_found"`.
 
+Go is the reference SDK shape for caller-initiated synchronous cancellation:
+pass a cancelable `context.Context` to `SignRequestsWithContext` or
+`SignGroupWithContext`. If that context is canceled before apsigner responds,
+the SDK sends best-effort `/sign/cancel` for the generated or supplied
+`request_id`.
+
 ### Config Helpers
 
 #### `LoadConfig(dataDir) (*Config, error)`

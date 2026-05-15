@@ -246,6 +246,11 @@ request times out or disconnects.
 `cancelSignRequest(requestId)` exposes explicit synchronous sign-request
 cancellation for advanced callers that already know a request ID.
 
+TypeScript high-level signing currently generates its request ID internally and
+does not expose a cancel handle. It cleans up on local timeout/disconnect; true
+user-initiated cancellation requires an application-owned request ID plus
+`cancelSignRequest()`, or a future cancelable high-level signing API.
+
 ## Common Tasks
 
 ### Health Check
