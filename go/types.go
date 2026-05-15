@@ -5,6 +5,8 @@ package aplane
 
 import "fmt"
 
+const maxSignRequestIDLength = 128
+
 // The signer HTTP DTOs and validation semantics in this file intentionally
 // mirror contracts/signerapi fixtures and server pkg/signerapi/types.go. Keep JSON
 // fields, request-mode validation, and response field meanings in sync without
@@ -43,16 +45,35 @@ type SignResponse struct {
 
 // GroupSignRequest is the request payload for the /sign endpoint.
 type GroupSignRequest struct {
-	Requests []SignRequest `json:"requests"`
+	RequestID string        `json:"request_id,omitempty"`
+	Requests  []SignRequest `json:"requests"`
+}
+
+// CancelSignRequest is the request payload for /sign/cancel.
+type CancelSignRequest struct {
+	RequestID string `json:"request_id"`
+}
+
+// CancelSignResponse is the response payload for /sign/cancel.
+type CancelSignResponse struct {
+	Success bool            `json:"success"`
+	State   SignCancelState `json:"state,omitempty"`
+	Error   string          `json:"error,omitempty"`
 }
 
 // RequestMode describes the mutually exclusive mode selected by a SignRequest.
 type RequestMode string
 
+// SignCancelState describes the result of a /sign/cancel lifecycle transition.
+type SignCancelState string
+
 const (
 	RequestModeSign        RequestMode = "sign"
 	RequestModePassthrough RequestMode = "passthrough"
 	RequestModeForeign     RequestMode = "foreign"
+
+	SignCancelStateCanceled SignCancelState = "canceled"
+	SignCancelStateNotFound SignCancelState = "not_found"
 )
 
 // Mode returns the request mode selected by this SignRequest.
@@ -87,6 +108,9 @@ func (r SignRequest) Validate() error {
 
 // Validate checks that all contained requests use a supported request mode.
 func (r GroupSignRequest) Validate() error {
+	if err := validateSignRequestID(r.RequestID); err != nil {
+		return err
+	}
 	if len(r.Requests) == 0 {
 		return fmt.Errorf("requests array is empty")
 	}
@@ -114,6 +138,34 @@ func (r GroupSignRequest) Validate() error {
 	}
 	if signCount == 0 && foreignCount > 0 {
 		return fmt.Errorf("no signable transactions: all entries are foreign. Build and submit this group locally instead of using apsigner")
+	}
+	return nil
+}
+
+// Validate checks that the cancel request names a concrete sign request.
+func (r CancelSignRequest) Validate() error {
+	if r.RequestID == "" {
+		return fmt.Errorf("request_id is required")
+	}
+	return validateSignRequestID(r.RequestID)
+}
+
+func validateSignRequestID(id string) error {
+	if id == "" {
+		return nil
+	}
+	if len(id) > maxSignRequestIDLength {
+		return fmt.Errorf("request_id is too long")
+	}
+	for i := 0; i < len(id); i++ {
+		ch := id[i]
+		if (ch >= 'a' && ch <= 'z') ||
+			(ch >= 'A' && ch <= 'Z') ||
+			(ch >= '0' && ch <= '9') ||
+			ch == '-' || ch == '_' || ch == '.' || ch == ':' {
+			continue
+		}
+		return fmt.Errorf("request_id contains invalid character %q", ch)
 	}
 	return nil
 }

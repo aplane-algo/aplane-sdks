@@ -387,6 +387,13 @@ func TestSignRequestsDiscoversApprovalWaitBeforeSigning(t *testing.T) {
 				ApprovalWaitSeconds: 60,
 			})
 		case "/sign":
+			var signReq GroupSignRequest
+			if err := json.NewDecoder(r.Body).Decode(&signReq); err != nil {
+				t.Fatalf("decode /sign request: %v", err)
+			}
+			if signReq.RequestID == "" {
+				t.Fatal("/sign request_id is empty")
+			}
 			json.NewEncoder(w).Encode(GroupSignResponse{Signed: []string{"deadbeef"}})
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
@@ -402,6 +409,94 @@ func TestSignRequestsDiscoversApprovalWaitBeforeSigning(t *testing.T) {
 	}
 	if got := strings.Join(paths, ","); got != "/status,/sign" {
 		t.Fatalf("paths = %s, want /status,/sign", got)
+	}
+}
+
+func TestCancelSignRequestWithContext(t *testing.T) {
+	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/sign/cancel" {
+			t.Fatalf("request = %s %s, want POST /sign/cancel", r.Method, r.URL.Path)
+		}
+		var cancelReq CancelSignRequest
+		if err := json.NewDecoder(r.Body).Decode(&cancelReq); err != nil {
+			t.Fatalf("decode cancel request: %v", err)
+		}
+		if cancelReq.RequestID != "sdk-test" {
+			t.Fatalf("RequestID = %q, want sdk-test", cancelReq.RequestID)
+		}
+		json.NewEncoder(w).Encode(CancelSignResponse{Success: true, State: SignCancelStateCanceled})
+	})
+	defer server.Close()
+
+	resp, err := client.CancelSignRequestWithContext(context.Background(), "sdk-test")
+	if err != nil {
+		t.Fatalf("CancelSignRequestWithContext() error = %v", err)
+	}
+	if resp.State != SignCancelStateCanceled {
+		t.Fatalf("State = %q, want canceled", resp.State)
+	}
+}
+
+func TestSignRequestsCancelsApprovalWhenContextCanceled(t *testing.T) {
+	signStarted := make(chan string, 1)
+	cancelReceived := make(chan string, 1)
+	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/sign":
+			var signReq GroupSignRequest
+			if err := json.NewDecoder(r.Body).Decode(&signReq); err != nil {
+				t.Fatalf("decode /sign request: %v", err)
+			}
+			if signReq.RequestID == "" {
+				t.Fatal("/sign request_id is empty")
+			}
+			signStarted <- signReq.RequestID
+			<-r.Context().Done()
+		case "/sign/cancel":
+			var cancelReq CancelSignRequest
+			if err := json.NewDecoder(r.Body).Decode(&cancelReq); err != nil {
+				t.Fatalf("decode /sign/cancel request: %v", err)
+			}
+			cancelReceived <- cancelReq.RequestID
+			json.NewEncoder(w).Encode(CancelSignResponse{Success: true, State: SignCancelStateCanceled})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+	defer server.Close()
+
+	client.cacheApprovalWait(60)
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() {
+		_, err := client.SignRequestsWithContext(ctx, []SignRequest{{AuthAddress: "AUTH", TxnBytesHex: "545801"}})
+		result <- err
+	}()
+
+	var requestID string
+	select {
+	case requestID = <-signStarted:
+	case <-time.After(time.Second):
+		t.Fatal("/sign request was not sent")
+	}
+	cancel()
+
+	select {
+	case got := <-cancelReceived:
+		if got != requestID {
+			t.Fatalf("/sign/cancel request_id = %q, want %q", got, requestID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("/sign/cancel was not sent")
+	}
+
+	select {
+	case err := <-result:
+		if err == nil || !strings.Contains(err.Error(), "context canceled") {
+			t.Fatalf("SignRequestsWithContext() error = %v, want context canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("SignRequestsWithContext() did not return")
 	}
 }
 

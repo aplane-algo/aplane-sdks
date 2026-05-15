@@ -6,6 +6,7 @@ package aplane
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/algorand/go-algorand-sdk/v2/types"
@@ -42,11 +44,20 @@ const (
 	inventoryTimeout          = 30 * time.Second
 	mutationTimeout           = 60 * time.Second
 	groupPlanTimeout          = 60 * time.Second
+	signCancelTimeout         = 5 * time.Second
 	signApprovalSlack         = 30 * time.Second
 	defaultSignRequestTimeout = 6 * time.Minute
 	maxDiscoveredApprovalWait = 30 * time.Minute
 	approvalWaitRefresh       = 5 * time.Minute
 )
+
+func newSignRequestID() (string, error) {
+	var random [16]byte
+	if _, err := rand.Read(random[:]); err != nil {
+		return "", err
+	}
+	return "sdk-" + hex.EncodeToString(random[:]), nil
+}
 
 // NewSignerClientWithToken creates a signer client for an already-known base URL.
 // This is useful when the caller owns the transport or tunnel lifecycle.
@@ -741,10 +752,25 @@ func validateRequests(requests []SignRequest) error {
 
 // SignRequestsWithContext posts raw /sign requests and returns the server response.
 func (c *SignerClient) SignRequestsWithContext(ctx context.Context, requests []SignRequest) (*GroupSignResponse, error) {
-	if err := validateRequests(requests); err != nil {
+	requestID, err := newSignRequestID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sign request ID: %w", err)
+	}
+	return c.SignGroupWithContext(ctx, GroupSignRequest{RequestID: requestID, Requests: requests})
+}
+
+// SignGroupWithContext posts a server-shaped /sign request and returns the server response.
+func (c *SignerClient) SignGroupWithContext(ctx context.Context, groupReq GroupSignRequest) (*GroupSignResponse, error) {
+	if groupReq.RequestID == "" {
+		requestID, err := newSignRequestID()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sign request ID: %w", err)
+		}
+		groupReq.RequestID = requestID
+	}
+	if err := groupReq.Validate(); err != nil {
 		return nil, err
 	}
-	groupReq := groupSignRequest{Requests: requests}
 
 	jsonBody, err := json.Marshal(groupReq)
 	if err != nil {
@@ -756,6 +782,22 @@ func (c *SignerClient) SignRequestsWithContext(ctx context.Context, requests []S
 	reqCtx, cancel := c.requestContext(ctx, c.signRequestTimeout())
 	defer cancel()
 
+	var completed atomic.Bool
+	var cancelOnce sync.Once
+	sendCancel := func() {
+		cancelOnce.Do(func() {
+			cancelCtx, cancel := context.WithTimeout(context.Background(), signCancelTimeout)
+			defer cancel()
+			_, _ = c.CancelSignRequestWithContext(cancelCtx, groupReq.RequestID)
+		})
+	}
+	go func() {
+		<-reqCtx.Done()
+		if !completed.Load() {
+			sendCancel()
+		}
+	}()
+
 	req, err := http.NewRequestWithContext(reqCtx, "POST", c.baseURL+"/sign", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -765,8 +807,13 @@ func (c *SignerClient) SignRequestsWithContext(ctx context.Context, requests []S
 
 	resp, err := c.client.Do(req)
 	if err != nil {
+		if reqCtx.Err() != nil {
+			sendCancel()
+		}
+		completed.Store(true)
 		return nil, fmt.Errorf("failed to make request to Signer: %w", err)
 	}
+	completed.Store(true)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -783,6 +830,56 @@ func (c *SignerClient) SignRequestsWithContext(ctx context.Context, requests []S
 	}
 
 	return &groupResp, nil
+}
+
+// CancelSignRequest asks apsigner to cancel a pending manual approval request.
+func (c *SignerClient) CancelSignRequest(requestID string) (*CancelSignResponse, error) {
+	return c.CancelSignRequestWithContext(context.Background(), requestID)
+}
+
+// CancelSignRequestWithContext asks apsigner to cancel a pending manual approval request.
+func (c *SignerClient) CancelSignRequestWithContext(ctx context.Context, requestID string) (*CancelSignResponse, error) {
+	cancelReq := CancelSignRequest{RequestID: requestID}
+	if err := cancelReq.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid sign cancel request: %w", err)
+	}
+
+	jsonBody, err := json.Marshal(cancelReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	reqCtx, cancel := c.requestContext(ctx, signCancelTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, "POST", c.baseURL+"/sign/cancel", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "aplane "+c.token)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to cancel sign request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return nil, ErrAuthentication
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("signer cancel error (%d): %s", resp.StatusCode, readErrorBody(resp))
+	}
+
+	var cancelResp CancelSignResponse
+	if err := json.NewDecoder(resp.Body).Decode(&cancelResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	if cancelResp.Error != "" {
+		return &cancelResp, fmt.Errorf("sign cancel failed: %s", cancelResp.Error)
+	}
+	return &cancelResp, nil
 }
 
 // sign performs the actual signing request.
@@ -816,10 +913,14 @@ func (c *SignerClient) signList(requests []SignRequest) ([]string, error) {
 }
 
 func (c *SignerClient) signResponse(requests []SignRequest) (*GroupSignResponse, error) {
-	if err := validateRequests(requests); err != nil {
-		return nil, err
+	requestID, err := newSignRequestID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sign request ID: %w", err)
 	}
-	groupReq := groupSignRequest{Requests: requests}
+	groupReq := groupSignRequest{RequestID: requestID, Requests: requests}
+	if err := groupReq.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid sign request: %w", err)
+	}
 
 	jsonBody, err := json.Marshal(groupReq)
 	if err != nil {
@@ -832,6 +933,22 @@ func (c *SignerClient) signResponse(requests []SignRequest) (*GroupSignResponse,
 	reqCtx, cancel := c.requestContext(ctx, c.signRequestTimeout())
 	defer cancel()
 
+	var completed atomic.Bool
+	var cancelOnce sync.Once
+	sendCancel := func() {
+		cancelOnce.Do(func() {
+			cancelCtx, cancel := context.WithTimeout(context.Background(), signCancelTimeout)
+			defer cancel()
+			_, _ = c.CancelSignRequestWithContext(cancelCtx, requestID)
+		})
+	}
+	go func() {
+		<-reqCtx.Done()
+		if !completed.Load() {
+			sendCancel()
+		}
+	}()
+
 	req, err := http.NewRequestWithContext(reqCtx, "POST", c.baseURL+"/sign", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -841,8 +958,13 @@ func (c *SignerClient) signResponse(requests []SignRequest) (*GroupSignResponse,
 
 	resp, err := c.client.Do(req)
 	if err != nil {
+		if reqCtx.Err() != nil {
+			sendCancel()
+		}
+		completed.Store(true)
 		return nil, fmt.Errorf("failed to sign: %w", err)
 	}
+	completed.Store(true)
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 401 {
