@@ -4,6 +4,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as net from "net";
+import { randomBytes } from "crypto";
 import type { Transaction } from "algosdk";
 import type { Client as SSHClient, ClientChannel } from "ssh2";
 import type {
@@ -23,6 +24,7 @@ import type {
   PlanGroupResponse,
   RuntimeArg,
   MutationReport,
+  CancelSignResponse,
 } from "./types.js";
 import {
   SignerError,
@@ -52,10 +54,34 @@ const STATUS_TIMEOUT = 5000;
 const INVENTORY_TIMEOUT = 30000;
 const MUTATION_TIMEOUT = 60000;
 const GROUP_PLAN_TIMEOUT = 60000;
+const SIGN_CANCEL_TIMEOUT = 5000;
 const SIGN_APPROVAL_SLACK = 30000;
 const DEFAULT_SIGN_REQUEST_TIMEOUT = 360000;
 const MAX_DISCOVERED_APPROVAL_WAIT = 1800000;
 const APPROVAL_WAIT_REFRESH = 300000;
+const MAX_SIGN_REQUEST_ID_LENGTH = 128;
+
+function newSignRequestId(): string {
+  return `sdk-${randomBytes(16).toString("hex")}`;
+}
+
+function validateSignRequestId(requestId: string, required = false): void {
+  if (!requestId) {
+    if (required) {
+      throw new SignerError("request_id is required");
+    }
+    return;
+  }
+  if (requestId.length > MAX_SIGN_REQUEST_ID_LENGTH) {
+    throw new SignerError("request_id is too long");
+  }
+  for (const ch of requestId) {
+    if (/^[A-Za-z0-9_.:-]$/.test(ch)) {
+      continue;
+    }
+    throw new SignerError(`request_id contains invalid character ${JSON.stringify(ch)}`);
+  }
+}
 
 /**
  * Find an available local port.
@@ -807,6 +833,43 @@ export class SignerClient {
   }
 
   /**
+   * Ask apsigner to cancel a live synchronous /sign request.
+   *
+   * Cancellation is idempotent for client behavior. A successful response
+   * returns state "canceled" or "not_found".
+   */
+  async cancelSignRequest(requestId: string): Promise<CancelSignResponse> {
+    validateSignRequestId(requestId, true);
+    const response = await this.fetch("/sign/cancel", {
+      method: "POST",
+      body: JSON.stringify({ request_id: requestId }),
+      timeout: this.timeoutFor(SIGN_CANCEL_TIMEOUT),
+    });
+
+    if (response.status === 401) {
+      throw new AuthenticationError();
+    }
+    if (response.status !== 200) {
+      const data = await this.safeJson(response);
+      throw new SignerError(String(data.error || `Sign cancel failed: HTTP ${response.status}`));
+    }
+
+    const data = (await response.json()) as CancelSignResponse;
+    if (data.error) {
+      throw new SignerError(data.error);
+    }
+    return data;
+  }
+
+  private async bestEffortCancelSignRequest(requestId: string): Promise<void> {
+    try {
+      await this.cancelSignRequest(requestId);
+    } catch {
+      // Best-effort cleanup only; preserve the original signing error.
+    }
+  }
+
+  /**
    * Preview group building without signing or approval.
    *
    * Sends the same request as signTransactions() to the /plan endpoint.
@@ -1138,14 +1201,23 @@ export class SignerClient {
     const requestBody = this.buildSignRequestBody(
       txns, authAddresses, lsigArgsMap, passthrough, lsigSizes, false,
     );
+    const requestId = newSignRequestId();
+    validateSignRequestId(requestId, true);
+    const signBody = { request_id: requestId, ...requestBody };
 
     await this.discoverApprovalWait();
 
-    const response = await this.fetch("/sign", {
-      method: "POST",
-      body: JSON.stringify(requestBody),
-      timeout: this.signRequestTimeout(),
-    });
+    let response: Response;
+    try {
+      response = await this.fetch("/sign", {
+        method: "POST",
+        body: JSON.stringify(signBody),
+        timeout: this.signRequestTimeout(),
+      });
+    } catch (error) {
+      await this.bestEffortCancelSignRequest(requestId);
+      throw error;
+    }
 
     // Handle errors
     if (response.status === 401) {

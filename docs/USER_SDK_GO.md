@@ -501,7 +501,11 @@ if err != nil {
 - `SignRequestsWithContext(...)` and `PlanRequestsWithContext(...)` let you
   bypass the transaction-to-request builder when you need raw request control.
 - Signing request deadlines are approval-wait-aware. A shorter caller context
-  deadline still wins and cancels queued/pending manual approval.
+  deadline still wins; SDK `/sign` calls include a `request_id` and send a
+  best-effort `/sign/cancel` when the caller context is canceled before the
+  signer responds.
+- `CancelSignRequestWithContext(...)` exposes explicit synchronous sign-request
+  cancellation for advanced callers that already know a request ID.
 - If you call `SetHTTPClient(...)` with a client-level timeout, that timeout is
   a hard cap and the SDK cannot extend it for long approval waits.
 - `known_hosts` verification is required for SSH unless you deliberately enable

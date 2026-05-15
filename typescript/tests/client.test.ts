@@ -566,12 +566,23 @@ describe("SignerClient", () => {
       abortError.name = "AbortError";
       queueStatusResponse();
       mockFetch.mockRejectedValueOnce(abortError);
+      mockFetch.mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: true, state: "canceled" }),
+      });
 
       const client = new SignerClient("http://localhost:11270", "test-token", 100);
       const mockTxn = createMockTxn() as Parameters<typeof client.signTransaction>[0];
 
       await assert.rejects(client.signTransaction(mockTxn), SignerUnavailableError);
-      assert.equal(mockFetch.mock.calls.length, 2);
+      assert.equal(mockFetch.mock.calls.length, 3);
+      assert.equal(mockFetch.mock.calls[1][0], "http://localhost:11270/sign");
+      const signBody = JSON.parse(mockFetch.mock.calls[1][1].body);
+      assert.match(signBody.request_id, /^sdk-[0-9a-f]{32}$/);
+      assert.equal(mockFetch.mock.calls[2][0], "http://localhost:11270/sign/cancel");
+      const cancelBody = JSON.parse(mockFetch.mock.calls[2][1].body);
+      assert.equal(cancelBody.request_id, signBody.request_id);
     });
 
     it("continues signing with fallback timeout when status discovery fails", async () => {
@@ -612,6 +623,30 @@ describe("SignerClient", () => {
       await client.getStatus();
 
       assert.equal((client as any).signRequestTimeout(), 360000);
+    });
+  });
+
+  describe("cancelSignRequest", () => {
+    it("returns cancel state", async () => {
+      mockFetch.mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ success: true, state: "not_found" }),
+      });
+
+      const client = new SignerClient("http://localhost:11270", "test-token");
+      const result = await client.cancelSignRequest("sdk-test");
+
+      assert.equal(result.success, true);
+      assert.equal(result.state, "not_found");
+      assert.equal(mockFetch.mock.calls[0][0], "http://localhost:11270/sign/cancel");
+      assert.deepEqual(JSON.parse(mockFetch.mock.calls[0][1].body), { request_id: "sdk-test" });
+    });
+
+    it("validates request id", async () => {
+      const client = new SignerClient("http://localhost:11270", "test-token");
+      await assert.rejects(client.cancelSignRequest(""), { message: /request_id is required/ });
+      await assert.rejects(client.cancelSignRequest("bad id"), { message: /invalid character/ });
     });
   });
 });
@@ -757,6 +792,7 @@ describe("buildSignRequests", () => {
     await client.signTransaction(mockTxn, "AUTH_ADDR");
 
     const capturedBody = JSON.parse(mockFetch.mock.calls[1][1].body);
+    assert.match(capturedBody.request_id, /^sdk-[0-9a-f]{32}$/);
     assert.equal(capturedBody.requests.length, 1);
     assert.equal(capturedBody.requests[0].auth_address, "AUTH_ADDR");
     assert.notEqual(capturedBody.requests[0].txn_bytes_hex, undefined);

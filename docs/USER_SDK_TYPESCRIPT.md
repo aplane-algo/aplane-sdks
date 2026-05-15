@@ -239,7 +239,12 @@ This is useful when:
 Prefer the SSH-backed paths above. For advanced integrations that already own
 the HTTP transport path, the public `SignerClient(baseUrl, token, timeout)`
 constructor can be used directly. An explicit timeout shorter than the signer
-approval wait will cancel queued/pending manual approval.
+approval wait will cancel queued/pending manual approval; SDK `/sign` calls
+include a `request_id` and send a best-effort `/sign/cancel` when the HTTP
+request times out or disconnects.
+
+`cancelSignRequest(requestId)` exposes explicit synchronous sign-request
+cancellation for advanced callers that already know a request ID.
 
 ## Common Tasks
 

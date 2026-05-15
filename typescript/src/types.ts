@@ -205,6 +205,27 @@ export interface PlanGroupResponse {
 }
 
 /**
+ * Sign cancellation lifecycle state returned by /sign/cancel.
+ */
+export type SignCancelState = "canceled" | "not_found";
+
+/**
+ * Request payload for /sign/cancel.
+ */
+export interface CancelSignRequest {
+  request_id: string;
+}
+
+/**
+ * Response from the /sign/cancel endpoint.
+ */
+export interface CancelSignResponse {
+  success: boolean;
+  state?: SignCancelState;
+  error?: string;
+}
+
+/**
  * LogicSig runtime arguments for a single address.
  * Maps argument name to its value as Uint8Array.
  */

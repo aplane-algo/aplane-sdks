@@ -7,6 +7,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { SignerClient } from "../src/client.js";
+import type { CancelSignResponse } from "../src/types.js";
 
 interface MockFetch {
   (...args: any[]): Promise<any>;
@@ -180,6 +181,13 @@ describe("signer API contract fixtures", () => {
     assert.equal(identity.keyCount, 37);
     assert.equal(identity.keysetRevision, 4);
     assert.equal(identity.approvalWaitSeconds, 60);
+  });
+
+  it("maps /sign/cancel response state", () => {
+    const result = fixture("cancel_sign_response_success.json") as CancelSignResponse;
+
+    assert.equal(result.success, true);
+    assert.equal(result.state, "canceled");
   });
 
   it("maps optional /keys template warning fields", async () => {

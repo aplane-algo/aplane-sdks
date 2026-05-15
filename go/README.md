@@ -277,7 +277,15 @@ signResp, err := client.SignRequestsWithContext(ctx, []aplane.SignRequest{
 Signing requests discover `/status.approval_wait_seconds` and use that value
 plus 30 seconds of slack for the HTTP deadline. If discovery fails or an older
 signer omits the field, the SDK falls back to 6 minutes. A shorter caller
-context deadline still wins and cancels queued/pending manual approval.
+context deadline still wins; SDK `/sign` calls include a `request_id` and send
+a best-effort `/sign/cancel` when the caller context is canceled before the
+signer responds.
+
+#### `CancelSignRequestWithContext(ctx, requestID) (*CancelSignResponse, error)`
+
+Ask apsigner to cancel a live synchronous `/sign` request by request ID.
+Successful responses are idempotent for client behavior and return state
+`"canceled"` or `"not_found"`.
 
 ### Config Helpers
 

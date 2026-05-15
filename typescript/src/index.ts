@@ -81,6 +81,9 @@ export type {
   LsigArgsMap,
   MutationReport,
   PlanGroupResponse,
+  CancelSignRequest,
+  CancelSignResponse,
+  SignCancelState,
 } from "./types.js";
 
 // Constants

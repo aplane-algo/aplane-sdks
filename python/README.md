@@ -240,7 +240,14 @@ signed_list = client.sign_transactions_list([txn1, txn2])
 Signing calls discover `/status.approval_wait_seconds` and use that value
 plus 30 seconds of slack for the request timeout. If discovery fails or an older
 signer omits the field, signing falls back to 6 minutes. An explicit shorter
-timeout still wins and cancels queued/pending manual approval.
+timeout still wins; SDK `/sign` calls include a `request_id` and send a
+best-effort `/sign/cancel` when the HTTP request times out or disconnects.
+
+#### `cancel_sign_request(request_id) -> CancelSignResponse`
+
+Ask apsigner to cancel a live synchronous `/sign` request by request ID.
+Successful responses are idempotent for client behavior and return state
+`"canceled"` or `"not_found"`.
 
 #### `close()`
 
