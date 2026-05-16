@@ -44,7 +44,7 @@ describe("AlgoKit adapter", () => {
       client,
       address: zeroAddress,
       authAddress: "AUTHADDR",
-      requestId: () => "sdk-algokit-test",
+      newRequestId: () => "sdk-algokit-test",
       signal,
       lsigArgs: { preimage: new Uint8Array([1, 2]) },
       encodeTransaction: async (txn) => new Uint8Array([84, 88, Number(txn.sender?.toString())]),

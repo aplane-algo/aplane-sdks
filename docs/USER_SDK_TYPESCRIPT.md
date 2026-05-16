@@ -423,8 +423,8 @@ slots are accepted by `planGroup()` only.
 
 ### AlgoKit Utils Adapter
 
-The TypeScript SDK also exposes an optional AlgoKit adapter for v4-style
-transaction composers:
+The TypeScript SDK also exposes an optional AlgoKit Utils 4 (utils-ts v10)
+adapter for transaction composers:
 
 ```ts
 import { SignerClient, createApsignerAccount } from "aplane";
@@ -434,6 +434,7 @@ const account = createApsignerAccount({
   client,
   address: senderAddress,
   authAddress, // omit when the sender is not rekeyed
+  newRequestId: () => crypto.randomUUID(), // optional caller-owned per-call ID
 });
 
 algorand.setSignerFromAccount(account);

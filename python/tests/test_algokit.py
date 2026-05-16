@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: MIT
 # Copyright (C) 2026 APlane Project LLC
 
+from threading import Event, Thread
+
 import pytest
 
 from aplane.algokit import ApsignerAccount, create_apsigner_account, list_apsigner_accounts
@@ -15,10 +17,14 @@ class MockTxn:
 class MockSignerClient:
     def __init__(self) -> None:
         self.sign_calls = []
+        self.cancel_calls = []
 
     def sign_requests(self, requests, *, request_id=None):
         self.sign_calls.append((requests, request_id))
         return GroupSignResponse(signed=["aabb", "ccdd"])
+
+    def cancel_sign_request(self, request_id):
+        self.cancel_calls.append(request_id)
 
     def list_keys(self, refresh=False):
         return [
@@ -35,7 +41,7 @@ def test_account_signer_sends_requested_indexes() -> None:
         client,
         "SENDER",
         auth_address="AUTH",
-        request_id=lambda: "sdk-algokit-test",
+        new_request_id=lambda: "sdk-algokit-test",
         lsig_args={"preimage": b"\x01\x02"},
         encode_transaction=lambda txn: b"TX" + txn.sender.encode(),
     )
@@ -85,6 +91,76 @@ def test_create_apsigner_account() -> None:
 
     assert account.addr == "ADDR"
     assert callable(account.signer)
+
+
+def test_cancel_sends_current_request_id_best_effort() -> None:
+    client = MockSignerClient()
+    account = ApsignerAccount(
+        client,
+        "ADDR",
+        new_request_id=lambda: "sdk-cancel-test",
+        encode_transaction=lambda _txn: b"TX",
+    )
+
+    def sign_requests(requests, *, request_id=None):
+        client.sign_calls.append((requests, request_id))
+        account.cancel()
+        return GroupSignResponse(signed=["aabb"])
+
+    client.sign_requests = sign_requests
+
+    signed = account.signer([MockTxn("ADDR")], [0])
+
+    assert signed == [bytes.fromhex("aabb")]
+    assert client.cancel_calls == ["sdk-cancel-test"]
+
+
+def test_cancel_without_in_flight_request_is_noop() -> None:
+    client = MockSignerClient()
+    account = ApsignerAccount(client, "ADDR", encode_transaction=lambda _txn: b"TX")
+
+    account.cancel()
+
+    assert client.cancel_calls == []
+
+
+def test_concurrent_signing_is_rejected() -> None:
+    started = Event()
+    release = Event()
+    errors: list[BaseException] = []
+
+    class BlockingClient(MockSignerClient):
+        def sign_requests(self, requests, *, request_id=None):
+            self.sign_calls.append((requests, request_id))
+            started.set()
+            release.wait(2)
+            return GroupSignResponse(signed=["aabb"])
+
+    client = BlockingClient()
+    account = ApsignerAccount(
+        client,
+        "ADDR",
+        new_request_id=lambda: "sdk-concurrent-test",
+        encode_transaction=lambda _txn: b"TX",
+    )
+
+    def run_sign() -> None:
+        try:
+            account.signer([MockTxn("ADDR")], [0])
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread = Thread(target=run_sign)
+    thread.start()
+    assert started.wait(2)
+
+    with pytest.raises(RuntimeError, match="in-flight signing request"):
+        account.signer([MockTxn("ADDR")], [0])
+
+    release.set()
+    thread.join(2)
+    assert not thread.is_alive()
+    assert errors == []
 
 
 def test_rejects_reshaped_signer_response() -> None:

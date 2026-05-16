@@ -237,7 +237,7 @@ signed_list = client.sign_transactions_list([txn1, txn2])
 # signed_list is List[str], each element is a base64-encoded signed transaction
 ```
 
-#### `sign_requests(requests, request_id=None) -> GroupSignResponse`
+#### `sign_requests(sign_entries, request_id=None) -> GroupSignResponse`
 
 Send one or more raw `/sign` request entries. Use this when an integration
 already owns transaction encoding and wants APlane's native response shape.
@@ -255,7 +255,7 @@ response = client.sign_requests(
 
 ### AlgoKit Utils Adapter
 
-For AlgoKit Utils v5-style transaction composers, use the adapter account. It
+For AlgoKit Utils 4 (utils-py v5) transaction composers, use the adapter account. It
 implements the `addr` + `signer(txn_group, indexes_to_sign)` shape and delegates
 signing to `SignerClient.sign_requests()`.
 
@@ -278,13 +278,21 @@ transactions or reshape a group, so Falcon/LogicSig flows that need APlane
 group planning should use the native `plan_group()` / `sign_transactions()` path
 before handing transactions to AlgoKit.
 
+The Python AlgoKit signer is synchronous. `ApsignerAccount` tracks one active
+signing request at a time; overlapping calls on the same account raise
+`RuntimeError`. Use separate account objects for concurrent signing. For
+asyncio applications, run the AlgoKit call site in a worker thread, for example
+with `asyncio.to_thread(...)`. If an application needs to own request IDs, pass
+`new_request_id`, a callable that returns a fresh ID for each sign call.
+
 Signing calls discover `/status.approval_wait_seconds` and use that value
 plus 30 seconds of slack for the request timeout. If discovery fails or an older
 signer omits the field, signing falls back to 6 minutes. An explicit shorter
 timeout still wins; SDK `/sign` calls include a `request_id` and send a
 best-effort `/sign/cancel` when the HTTP request times out or disconnects.
-High-level signing methods accept an optional keyword-only `request_id` for
-applications that need user-initiated cancellation from another thread.
+High-level signing methods accept an optional keyword-only `request_id`.
+AlgoKit adapter callers can call `account.cancel()` from another thread to
+cancel the in-flight adapter request.
 
 #### `cancel_sign_request(request_id) -> CancelSignResponse`
 
@@ -301,6 +309,12 @@ request_id = "wallet-ui-approval-123"
 signed = client.sign_transaction(txn, request_id=request_id)
 # elsewhere, if the user aborts while approval is pending:
 client.cancel_sign_request(request_id)
+```
+
+For AlgoKit adapter signing, call `cancel()` on the account:
+
+```python
+account.cancel()
 ```
 
 #### `close()`

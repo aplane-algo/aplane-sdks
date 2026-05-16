@@ -40,7 +40,7 @@ import base64
 import json
 import os
 import re
-import requests as http_requests
+import requests
 import secrets
 import socket
 import time
@@ -613,7 +613,7 @@ class SignerClient:
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout if timeout and timeout > 0 else None
-        self.session = http_requests.Session()
+        self.session = requests.Session()
         self.session.headers["Authorization"] = f"aplane {token}"
         self._tunnel = tunnel
         self._key_cache: Dict[str, KeyInfo] = {}  # Cache key info by address
@@ -796,7 +796,7 @@ class SignerClient:
                 timeout=self._timeout_for(HEALTH_TIMEOUT)
             )
             return resp.status_code == 200
-        except http_requests.RequestException:
+        except requests.RequestException:
             return False
 
     def get_status(self) -> StatusResponse:
@@ -811,7 +811,7 @@ class SignerClient:
                 f"{self.base_url}/status",
                 timeout=self._timeout_for(STATUS_TIMEOUT)
             )
-        except http_requests.RequestException as e:
+        except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:
@@ -897,7 +897,7 @@ class SignerClient:
                 f"{self.base_url}/keys",
                 timeout=self._timeout_for(INVENTORY_TIMEOUT)
             )
-        except http_requests.RequestException as e:
+        except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:
@@ -966,7 +966,7 @@ class SignerClient:
                 f"{self.base_url}/keytypes",
                 timeout=self._timeout_for(INVENTORY_TIMEOUT)
             )
-        except http_requests.RequestException as e:
+        except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:
@@ -1053,7 +1053,7 @@ class SignerClient:
                 json=body,
                 timeout=self._timeout_for(MUTATION_TIMEOUT)
             )
-        except http_requests.RequestException as e:
+        except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:
@@ -1100,7 +1100,7 @@ class SignerClient:
                 params={"address": address},
                 timeout=self._timeout_for(MUTATION_TIMEOUT)
             )
-        except http_requests.RequestException as e:
+        except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:
@@ -1124,7 +1124,7 @@ class SignerClient:
         # Invalidate key cache
         self._key_cache.clear()
 
-    def _safe_json(self, resp: http_requests.Response) -> dict:
+    def _safe_json(self, resp: requests.Response) -> dict:
         """
         Parse JSON response safely.
 
@@ -1156,7 +1156,7 @@ class SignerClient:
                 json={"request_id": request_id},
                 timeout=self._timeout_for(SIGN_CANCEL_TIMEOUT),
             )
-        except http_requests.RequestException as e:
+        except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:
@@ -1357,7 +1357,7 @@ class SignerClient:
 
     def sign_requests(
         self,
-        requests: List[Dict[str, Any]],
+        sign_entries: List[Dict[str, Any]],
         *,
         request_id: Optional[str] = None,
     ) -> GroupSignResponse:
@@ -1368,15 +1368,15 @@ class SignerClient:
         adapters can use this method directly when they already own transaction
         encoding.
         """
-        if not requests:
-            raise ValueError("requests must not be empty")
+        if not sign_entries:
+            raise ValueError("sign_entries must not be empty")
 
         if request_id is None:
             request_id = _new_sign_request_id()
         _validate_sign_request_id(request_id, required=True)
         request_body = {
             "request_id": request_id,
-            "requests": requests,
+            "requests": sign_entries,
         }
 
         self._discover_approval_wait()
@@ -1387,7 +1387,7 @@ class SignerClient:
                 json=request_body,
                 timeout=self._sign_request_timeout()
             )
-        except http_requests.RequestException as e:
+        except requests.RequestException as e:
             self._best_effort_cancel_sign_request(request_id)
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
@@ -1491,7 +1491,7 @@ class SignerClient:
                 json=request_body,
                 timeout=self._timeout_for(GROUP_PLAN_TIMEOUT)
             )
-        except http_requests.RequestException as e:
+        except requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:

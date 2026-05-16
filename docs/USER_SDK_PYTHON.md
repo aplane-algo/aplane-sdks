@@ -418,8 +418,8 @@ Use `plan_group()` when you need:
 
 ### AlgoKit Utils Adapter
 
-The Python SDK also exposes an optional AlgoKit adapter for v5-style
-transaction composers:
+The Python SDK also exposes an optional AlgoKit Utils 4 (utils-py v5) adapter
+for transaction composers:
 
 ```python
 from aplane import SignerClient
@@ -441,6 +441,14 @@ The adapter implements the AlgoKit `addr` plus
 AlgoKit requests; it does not add dummies or reshape the group. For Falcon or
 LogicSig flows that need APlane group planning, use `plan_group()` or
 `sign_transactions()` before handing transactions to AlgoKit.
+
+The Python AlgoKit signer callback is synchronous. `ApsignerAccount` exposes
+`cancel()` as the cancellation side channel and rejects overlapping sign calls
+on the same account with `RuntimeError`. Use separate account objects for
+concurrent signing. In asyncio applications, wrap the AlgoKit call site with
+`asyncio.to_thread(...)` so the event loop is not blocked while the operator
+approves the request. If an application needs to own request IDs, pass
+`new_request_id`, a callable that returns a fresh ID for each sign call.
 
 ## Transaction Semantics
 

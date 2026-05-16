@@ -43,8 +43,8 @@ export interface ApsignerAccountOptions {
   authAddress?: string;
   /** Runtime LogicSig args to send with each signed transaction. */
   lsigArgs?: LsigArgs;
-  /** Optional caller-owned request ID, or a factory that returns one per sign call. */
-  requestId?: string | (() => string);
+  /** Optional factory that returns a caller-owned request ID per sign call. */
+  newRequestId?: () => string;
   /** Optional cancellation signal for the /sign request. */
   signal?: AbortSignal;
   /** Override transaction encoding, mostly useful for tests. */
@@ -129,7 +129,7 @@ export class ApsignerAlgoKitAccount implements ApsignerAccount {
 
   private readonly client: RequestsSignerClient;
   private readonly lsigArgs?: LsigArgs;
-  private readonly requestId?: string | (() => string);
+  private readonly newRequestId?: () => string;
   private readonly signal?: AbortSignal;
   private readonly encodeTransaction: AlgoKitTransactionEncoder;
 
@@ -138,17 +138,14 @@ export class ApsignerAlgoKitAccount implements ApsignerAccount {
     this.addr = options.addressObject ?? new AlgorandAddressLike(options.address);
     this.authAddress = options.authAddress ?? options.address;
     this.lsigArgs = options.lsigArgs;
-    this.requestId = options.requestId;
+    this.newRequestId = options.newRequestId;
     this.signal = options.signal;
     this.encodeTransaction = options.encodeTransaction ?? defaultEncodeAlgoKitTransaction;
     this.signer = async (txnGroup, indexesToSign) => this.sign(txnGroup, indexesToSign);
   }
 
   private nextRequestId(): string | undefined {
-    if (typeof this.requestId === "function") {
-      return this.requestId();
-    }
-    return this.requestId;
+    return this.newRequestId?.();
   }
 
   private async sign(

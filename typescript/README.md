@@ -275,7 +275,7 @@ const response = await client.signRequests(
 
 ### AlgoKit Utils Adapter
 
-For AlgoKit Utils v4-style transaction composers, use the adapter account. It
+For AlgoKit Utils 4 (utils-ts v10) transaction composers, use the adapter account. It
 implements the `addr` + `signer(txnGroup, indexesToSign)` shape and delegates
 signing to `SignerClient.signRequests()`.
 
@@ -287,6 +287,7 @@ const account = createApsignerAccount({
   client,
   address: "SENDER_ADDRESS",
   authAddress: "SIGNER_KEY_ADDRESS", // omit when not rekeyed
+  newRequestId: () => crypto.randomUUID(), // optional caller-owned per-call ID
 });
 
 algorand.setSignerFromAccount(account);
