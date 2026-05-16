@@ -545,6 +545,42 @@ class TestCancelSignRequest:
             _validate_sign_request_id("bad id", required=True)
 
 
+class TestSignRequests:
+    def test_sign_requests_sends_raw_request(self):
+        client = make_client()
+        resp = mock_response(200, {"signed": ["deadbeef"]})
+
+        with patch.object(client.session, "post", return_value=resp) as mock_post:
+            result = client.sign_requests(
+                [
+                    {
+                        "txn_bytes_hex": "545801",
+                        "auth_address": "AUTH",
+                        "txn_sender": "SENDER",
+                    },
+                ],
+                request_id="raw-requests-id",
+            )
+
+        assert result.signed == ["deadbeef"]
+        assert mock_post.call_args.args[0] == "http://localhost:11270/sign"
+        assert mock_post.call_args.kwargs["json"] == {
+            "request_id": "raw-requests-id",
+            "requests": [
+                {
+                    "txn_bytes_hex": "545801",
+                    "auth_address": "AUTH",
+                    "txn_sender": "SENDER",
+                },
+            ],
+        }
+
+    def test_sign_requests_validates_request_id(self):
+        client = make_client()
+        with pytest.raises(ValueError, match="invalid character"):
+            client.sign_requests([{"txn_bytes_hex": "545801"}], request_id="bad id")
+
+
 # ---------------------------------------------------------------------------
 # sign_transactions with foreign entries
 # ---------------------------------------------------------------------------

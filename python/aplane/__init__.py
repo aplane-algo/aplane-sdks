@@ -58,6 +58,7 @@ from .signer import (
     KeyTypeInfo,
     StatusResponse,
     CancelSignResponse,
+    GroupSignResponse,
     GenerateResult,
 )
 
@@ -99,5 +100,6 @@ __all__ = [
     "KeyTypeInfo",
     "StatusResponse",
     "CancelSignResponse",
+    "GroupSignResponse",
     "GenerateResult",
 ]

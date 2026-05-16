@@ -28,6 +28,11 @@
 
 // Main client
 export { SignerClient } from "./client.js";
+export {
+  ApsignerAlgoKitAccount,
+  createApsignerAccount,
+  listApsignerAccounts,
+} from "./algokit.js";
 
 // Utilities
 export {
@@ -80,12 +85,24 @@ export type {
   LsigArgs,
   LsigArgsMap,
   SignOptions,
+  SignRequest,
+  GroupSignRequest,
+  GroupSignResponse,
   MutationReport,
   PlanGroupResponse,
   CancelSignRequest,
   CancelSignResponse,
   SignCancelState,
 } from "./types.js";
+
+export type {
+  AlgoKitAddress,
+  AlgoKitTransaction,
+  AlgoKitTransactionEncoder,
+  AlgoKitTransactionSigner,
+  ApsignerAccount,
+  ApsignerAccountOptions,
+} from "./algokit.js";
 
 // Constants
 export { DEFAULT_SIGNER_PORT, DEFAULT_SSH_PORT } from "./config.js";

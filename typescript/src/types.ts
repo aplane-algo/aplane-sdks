@@ -274,6 +274,16 @@ export interface SignRequest {
 }
 
 /**
+ * Request payload for /sign.
+ */
+export interface GroupSignRequest {
+  /** Optional caller-owned request ID for cancellation. Generated when omitted. */
+  request_id?: string;
+  /** Transaction slots to sign or pass through. */
+  requests: SignRequest[];
+}
+
+/**
  * Optional app-call metadata for approval rendering.
  */
 export interface AppCallInfo {

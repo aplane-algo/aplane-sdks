@@ -15,6 +15,7 @@ import type {
   LsigArgs,
   LsigArgsMap,
   SignRequest,
+  GroupSignRequest,
   GroupSignResponse,
   StatusResponse,
   KeysResponse,
@@ -1102,6 +1103,83 @@ export class SignerClient {
   }
 
   /**
+   * Send raw signing request entries to /sign.
+   *
+   * Higher-level helpers build these entries from algosdk transactions;
+   * adapters can use this method directly when they already own transaction
+   * encoding.
+   */
+  async signRequests(
+    requests: SignRequest[],
+    options?: SignOptions,
+  ): Promise<GroupSignResponse> {
+    if (requests.length === 0) {
+      throw new SignerError("requests must not be empty");
+    }
+
+    const requestId = options?.requestId ?? newSignRequestId();
+    validateSignRequestId(requestId, true);
+    const signBody: GroupSignRequest = { request_id: requestId, requests };
+
+    await this.discoverApprovalWait();
+
+    let response: Response;
+    try {
+      response = await this.fetch("/sign", {
+        method: "POST",
+        body: JSON.stringify(signBody),
+        timeout: this.signRequestTimeout(),
+        signal: options?.signal,
+      });
+    } catch (error) {
+      await this.bestEffortCancelSignRequest(requestId);
+      throw error;
+    }
+
+    if (response.status === 401) {
+      throw new AuthenticationError();
+    }
+
+    if (response.status === 400) {
+      const data = await this.safeJson(response);
+      const error = String(data.error || (await response.text()));
+      if (error.toLowerCase().includes("not found")) {
+        throw new KeyNotFoundError(error);
+      }
+      throw new SignerError(`Bad request: ${error}`);
+    }
+
+    if (response.status === 403) {
+      const data = await this.safeJson(response);
+      const error = String(data.error || "Signing request rejected by operator");
+      throw new SigningRejectedError(error);
+    }
+
+    if (response.status === 503) {
+      const data = await this.safeJson(response);
+      const error = String(data.error || "Signer unavailable");
+      throw new SignerUnavailableError(error);
+    }
+
+    if (response.status !== 200) {
+      throw new SignerError(`Signing failed: HTTP ${response.status}`);
+    }
+
+    let data: GroupSignResponse;
+    try {
+      data = (await response.json()) as GroupSignResponse;
+    } catch {
+      throw new SignerError("Server returned invalid JSON");
+    }
+
+    if (data.error) {
+      throw new SignerError(data.error);
+    }
+
+    return data;
+  }
+
+  /**
    * Build the JSON request body for /sign and /plan endpoints.
    */
   private buildSignRequestBody(
@@ -1206,66 +1284,7 @@ export class SignerClient {
     const requestBody = this.buildSignRequestBody(
       txns, authAddresses, lsigArgsMap, passthrough, lsigSizes, false,
     );
-    const requestId = options?.requestId ?? newSignRequestId();
-    validateSignRequestId(requestId, true);
-    const signBody = { request_id: requestId, ...requestBody };
-
-    await this.discoverApprovalWait();
-
-    let response: Response;
-    try {
-      response = await this.fetch("/sign", {
-        method: "POST",
-        body: JSON.stringify(signBody),
-        timeout: this.signRequestTimeout(),
-        signal: options?.signal,
-      });
-    } catch (error) {
-      await this.bestEffortCancelSignRequest(requestId);
-      throw error;
-    }
-
-    // Handle errors
-    if (response.status === 401) {
-      throw new AuthenticationError();
-    }
-
-    if (response.status === 400) {
-      const data = await this.safeJson(response);
-      const error = String(data.error || (await response.text()));
-      if (error.toLowerCase().includes("not found")) {
-        throw new KeyNotFoundError(error);
-      }
-      throw new SignerError(`Bad request: ${error}`);
-    }
-
-    if (response.status === 403) {
-      const data = await this.safeJson(response);
-      const error = String(data.error || "Signing request rejected by operator");
-      throw new SigningRejectedError(error);
-    }
-
-    if (response.status === 503) {
-      const data = await this.safeJson(response);
-      const error = String(data.error || "Signer unavailable");
-      throw new SignerUnavailableError(error);
-    }
-
-    if (response.status !== 200) {
-      throw new SignerError(`Signing failed: HTTP ${response.status}`);
-    }
-
-    // Parse successful response
-    let data: GroupSignResponse;
-    try {
-      data = (await response.json()) as GroupSignResponse;
-    } catch {
-      throw new SignerError("Server returned invalid JSON");
-    }
-
-    if (data.error) {
-      throw new SignerError(data.error);
-    }
+    const data = await this.signRequests(requestBody.requests, options);
 
     // Return hex-encoded signed transactions
     const signedHexes = data.signed || [];

@@ -416,6 +416,32 @@ Use `plan_group()` when you need:
 - unsigned post-mutation transactions for simulation
 - a first pass for multi-party coordination
 
+### AlgoKit Utils Adapter
+
+The Python SDK also exposes an optional AlgoKit adapter for v5-style
+transaction composers:
+
+```python
+from aplane import SignerClient
+from aplane.algokit import create_apsigner_account
+
+client = SignerClient.from_env()
+account = create_apsigner_account(
+    client,
+    sender_address,
+    auth_address=auth_address,  # omit when the sender is not rekeyed
+)
+
+algorand.set_signer_from_account(account)
+```
+
+The adapter implements the AlgoKit `addr` plus
+`signer(txn_group, indexes_to_sign)` shape and delegates to
+`SignerClient.sign_requests()`, the raw `/sign` SDK method. It signs the indexes
+AlgoKit requests; it does not add dummies or reshape the group. For Falcon or
+LogicSig flows that need APlane group planning, use `plan_group()` or
+`sign_transactions()` before handing transactions to AlgoKit.
+
 ## Transaction Semantics
 
 The Python SDK uses `py-algorand-sdk` transaction objects as input and returns
@@ -427,6 +453,8 @@ Important behavior:
 - `sign_transactions()` returns one base64 string containing the concatenated
   signed group
 - `sign_transactions_list()` returns one base64 string per slot
+- `sign_requests()` accepts one or more raw `/sign` request entries and returns the raw
+  `/sign` response
 - for large LogicSigs, the signer may add dummy transactions for fee pooling
 - the high-level signing helpers convert the server’s hex response to base64
 

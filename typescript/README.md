@@ -257,6 +257,46 @@ const signedList = await client.signTransactionsList([txn1, txn2]);
 // signedList is string[], each element is a base64-encoded signed transaction
 ```
 
+#### `signRequests(requests, options?): Promise<GroupSignResponse>`
+
+Send one or more raw `/sign` request entries. Use this when an integration
+already owns transaction encoding and wants APlane's native response shape.
+
+```typescript
+const response = await client.signRequests(
+  [{
+    txn_bytes_hex: "5458...",
+    auth_address: "SIGNER_KEY_ADDRESS",
+    txn_sender: "SENDER_ADDRESS",
+  }],
+  { requestId: "app-owned-request-id" },
+);
+```
+
+### AlgoKit Utils Adapter
+
+For AlgoKit Utils v4-style transaction composers, use the adapter account. It
+implements the `addr` + `signer(txnGroup, indexesToSign)` shape and delegates
+signing to `SignerClient.signRequests()`.
+
+```typescript
+import { SignerClient, createApsignerAccount } from "aplane";
+
+const client = await SignerClient.fromEnv();
+const account = createApsignerAccount({
+  client,
+  address: "SENDER_ADDRESS",
+  authAddress: "SIGNER_KEY_ADDRESS", // omit when not rekeyed
+});
+
+algorand.setSignerFromAccount(account);
+```
+
+The adapter signs the indexes AlgoKit requests. It does not add dummy
+transactions or reshape a group, so Falcon/LogicSig flows that need APlane
+group planning should use the native `planGroup()` / `signTransactions()` path
+before handing transactions to AlgoKit.
+
 Signing calls discover `/status.approval_wait_seconds` and use that value
 plus 30 seconds of slack for the request timeout. If discovery fails or an older
 signer omits the field, signing falls back to 6 minutes. An explicit shorter

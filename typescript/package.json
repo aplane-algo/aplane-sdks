@@ -34,6 +34,16 @@
         "types": "./dist/cjs/index.d.ts",
         "default": "./dist/cjs/index.js"
       }
+    },
+    "./algokit": {
+      "import": {
+        "types": "./dist/esm/algokit.d.ts",
+        "default": "./dist/esm/algokit.js"
+      },
+      "require": {
+        "types": "./dist/cjs/algokit.d.ts",
+        "default": "./dist/cjs/algokit.js"
+      }
     }
   },
   "files": [

@@ -237,6 +237,47 @@ signed_list = client.sign_transactions_list([txn1, txn2])
 # signed_list is List[str], each element is a base64-encoded signed transaction
 ```
 
+#### `sign_requests(requests, request_id=None) -> GroupSignResponse`
+
+Send one or more raw `/sign` request entries. Use this when an integration
+already owns transaction encoding and wants APlane's native response shape.
+
+```python
+response = client.sign_requests(
+    [{
+        "txn_bytes_hex": "5458...",
+        "auth_address": "SIGNER_KEY_ADDRESS",
+        "txn_sender": "SENDER_ADDRESS",
+    }],
+    request_id="app-owned-request-id",
+)
+```
+
+### AlgoKit Utils Adapter
+
+For AlgoKit Utils v5-style transaction composers, use the adapter account. It
+implements the `addr` + `signer(txn_group, indexes_to_sign)` shape and delegates
+signing to `SignerClient.sign_requests()`.
+
+```python
+from aplane import SignerClient
+from aplane.algokit import create_apsigner_account
+
+client = SignerClient.from_env()
+account = create_apsigner_account(
+    client,
+    "SENDER_ADDRESS",
+    auth_address="SIGNER_KEY_ADDRESS",  # omit when not rekeyed
+)
+
+algorand.set_signer_from_account(account)
+```
+
+The adapter signs the indexes AlgoKit requests. It does not add dummy
+transactions or reshape a group, so Falcon/LogicSig flows that need APlane
+group planning should use the native `plan_group()` / `sign_transactions()` path
+before handing transactions to AlgoKit.
+
 Signing calls discover `/status.approval_wait_seconds` and use that value
 plus 30 seconds of slack for the request timeout. If discovery fails or an older
 signer omits the field, signing falls back to 6 minutes. An explicit shorter

@@ -711,6 +711,50 @@ describe("SignerClient", () => {
     });
   });
 
+  describe("signRequests", () => {
+    it("sends raw signing requests and returns raw response", async () => {
+      queueStatusResponse();
+      mockFetch.mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ signed: ["deadbeef"] }),
+      });
+
+      const client = new SignerClient("http://localhost:11270", "test-token");
+      const result = await client.signRequests(
+        [
+          {
+            txn_bytes_hex: "545801",
+            auth_address: "AUTH",
+            txn_sender: "SENDER",
+          },
+        ],
+        { requestId: "raw-requests-id" },
+      );
+
+      assert.deepEqual(result, { signed: ["deadbeef"] });
+      assert.equal(mockFetch.mock.calls[1][0], "http://localhost:11270/sign");
+      assert.deepEqual(JSON.parse(mockFetch.mock.calls[1][1].body), {
+        request_id: "raw-requests-id",
+        requests: [
+          {
+            txn_bytes_hex: "545801",
+            auth_address: "AUTH",
+            txn_sender: "SENDER",
+          },
+        ],
+      });
+    });
+
+    it("validates raw group request IDs", async () => {
+      const client = new SignerClient("http://localhost:11270", "test-token");
+      await assert.rejects(
+        client.signRequests([{ txn_bytes_hex: "545801" }], { requestId: "bad id" }),
+        { message: /invalid character/ },
+      );
+    });
+  });
+
   describe("cancelSignRequest", () => {
     it("returns cancel state", async () => {
       mockFetch.mockResolvedValueOnce({

@@ -421,6 +421,31 @@ const combined = assembleGroup([aliceSigned, bobSigned]);
 The high-level final-signing helpers reject foreign slots for `/sign`; foreign
 slots are accepted by `planGroup()` only.
 
+### AlgoKit Utils Adapter
+
+The TypeScript SDK also exposes an optional AlgoKit adapter for v4-style
+transaction composers:
+
+```ts
+import { SignerClient, createApsignerAccount } from "aplane";
+
+const client = await SignerClient.fromEnv();
+const account = createApsignerAccount({
+  client,
+  address: senderAddress,
+  authAddress, // omit when the sender is not rekeyed
+});
+
+algorand.setSignerFromAccount(account);
+```
+
+The adapter implements the AlgoKit `addr` plus
+`signer(txnGroup, indexesToSign)` shape and delegates to
+`SignerClient.signRequests()`, the raw `/sign` SDK method. It signs the indexes
+AlgoKit requests; it does not add dummies or reshape the group. For Falcon or
+LogicSig flows that need APlane group planning, use `planGroup()` or
+`signTransactions()` before handing transactions to AlgoKit.
+
 ## Transaction Semantics
 
 - `signTransaction()` returns one base64 string containing the full signed
@@ -429,6 +454,8 @@ slots are accepted by `planGroup()` only.
   signed group.
 - `signTransactionsList()` returns per-slot base64 strings; it also rejects
   foreign slots for `/sign`.
+- `signRequests()` accepts one or more raw `/sign` request entries and returns the raw
+  `/sign` response.
 - `planGroup()` returns unsigned `TX`-prefixed hex transactions plus a mutation
   report.
 - passthrough entries are base64-encoded signed transaction msgpack slots that

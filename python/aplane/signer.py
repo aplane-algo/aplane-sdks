@@ -40,7 +40,7 @@ import base64
 import json
 import os
 import re
-import requests
+import requests as http_requests
 import secrets
 import socket
 import time
@@ -254,6 +254,14 @@ class CancelSignResponse:
     """Response from /sign/cancel"""
     success: bool
     state: str = ""
+    error: str = ""
+
+
+@dataclass
+class GroupSignResponse:
+    """Response from /sign"""
+    signed: List[str]
+    mutations: Optional[Dict[str, Any]] = None
     error: str = ""
 
 
@@ -605,7 +613,7 @@ class SignerClient:
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout if timeout and timeout > 0 else None
-        self.session = requests.Session()
+        self.session = http_requests.Session()
         self.session.headers["Authorization"] = f"aplane {token}"
         self._tunnel = tunnel
         self._key_cache: Dict[str, KeyInfo] = {}  # Cache key info by address
@@ -788,7 +796,7 @@ class SignerClient:
                 timeout=self._timeout_for(HEALTH_TIMEOUT)
             )
             return resp.status_code == 200
-        except requests.RequestException:
+        except http_requests.RequestException:
             return False
 
     def get_status(self) -> StatusResponse:
@@ -803,7 +811,7 @@ class SignerClient:
                 f"{self.base_url}/status",
                 timeout=self._timeout_for(STATUS_TIMEOUT)
             )
-        except requests.RequestException as e:
+        except http_requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:
@@ -889,7 +897,7 @@ class SignerClient:
                 f"{self.base_url}/keys",
                 timeout=self._timeout_for(INVENTORY_TIMEOUT)
             )
-        except requests.RequestException as e:
+        except http_requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:
@@ -958,7 +966,7 @@ class SignerClient:
                 f"{self.base_url}/keytypes",
                 timeout=self._timeout_for(INVENTORY_TIMEOUT)
             )
-        except requests.RequestException as e:
+        except http_requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:
@@ -1045,7 +1053,7 @@ class SignerClient:
                 json=body,
                 timeout=self._timeout_for(MUTATION_TIMEOUT)
             )
-        except requests.RequestException as e:
+        except http_requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:
@@ -1092,7 +1100,7 @@ class SignerClient:
                 params={"address": address},
                 timeout=self._timeout_for(MUTATION_TIMEOUT)
             )
-        except requests.RequestException as e:
+        except http_requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:
@@ -1116,7 +1124,7 @@ class SignerClient:
         # Invalidate key cache
         self._key_cache.clear()
 
-    def _safe_json(self, resp: requests.Response) -> dict:
+    def _safe_json(self, resp: http_requests.Response) -> dict:
         """
         Parse JSON response safely.
 
@@ -1148,7 +1156,7 @@ class SignerClient:
                 json={"request_id": request_id},
                 timeout=self._timeout_for(SIGN_CANCEL_TIMEOUT),
             )
-        except requests.RequestException as e:
+        except http_requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:
@@ -1330,10 +1338,46 @@ class SignerClient:
         request_body = self._build_sign_request_body(
             txns, auth_addresses, lsig_args_map, passthrough, lsig_sizes, False
         )
+        data = self.sign_requests(request_body["requests"], request_id=request_id)
+
+        # Parse signed transactions (convert hex to base64 for algosdk compatibility)
+        signed_hexes = data.signed
+        if not signed_hexes:
+            raise SignerError("Server returned no signed transactions")
+
+        result = []
+        for h in signed_hexes:
+            if not h:
+                raise SignerError(
+                    "Server returned empty signed transaction slot; use /plan "
+                    "for foreign or partial groups"
+                )
+            result.append(base64.b64encode(bytes.fromhex(h)).decode())
+        return result
+
+    def sign_requests(
+        self,
+        requests: List[Dict[str, Any]],
+        *,
+        request_id: Optional[str] = None,
+    ) -> GroupSignResponse:
+        """
+        Send raw signing request entries to /sign.
+
+        Higher-level helpers build these entries from algosdk transactions;
+        adapters can use this method directly when they already own transaction
+        encoding.
+        """
+        if not requests:
+            raise ValueError("requests must not be empty")
+
         if request_id is None:
             request_id = _new_sign_request_id()
         _validate_sign_request_id(request_id, required=True)
-        request_body["request_id"] = request_id
+        request_body = {
+            "request_id": request_id,
+            "requests": requests,
+        }
 
         self._discover_approval_wait()
 
@@ -1343,7 +1387,7 @@ class SignerClient:
                 json=request_body,
                 timeout=self._sign_request_timeout()
             )
-        except requests.RequestException as e:
+        except http_requests.RequestException as e:
             self._best_effort_cancel_sign_request(request_id)
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
@@ -1381,17 +1425,11 @@ class SignerClient:
         if data.get("error"):
             raise SignerError(data["error"])
 
-        # Parse signed transactions (convert hex to base64 for algosdk compatibility)
-        signed_hexes = data.get("signed", [])
-        if not signed_hexes:
-            raise SignerError("Server returned no signed transactions")
-
-        result = []
-        for h in signed_hexes:
-            if not h:
-                raise SignerError("Server returned empty signed transaction slot; use /plan for foreign or partial groups")
-            result.append(base64.b64encode(bytes.fromhex(h)).decode())
-        return result
+        return GroupSignResponse(
+            signed=data.get("signed", []),
+            mutations=data.get("mutations"),
+            error=data.get("error", ""),
+        )
 
     def plan_group(
         self,
@@ -1453,7 +1491,7 @@ class SignerClient:
                 json=request_body,
                 timeout=self._timeout_for(GROUP_PLAN_TIMEOUT)
             )
-        except requests.RequestException as e:
+        except http_requests.RequestException as e:
             raise SignerUnavailableError(f"Failed to connect: {e}")
 
         if resp.status_code == 401:
