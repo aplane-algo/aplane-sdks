@@ -440,12 +440,9 @@ const account = createApsignerAccount({
 algorand.setSignerFromAccount(account);
 ```
 
-The adapter implements the AlgoKit `addr` plus
-`signer(txnGroup, indexesToSign)` shape and delegates to
-`SignerClient.signRequests()`, the raw `/sign` SDK method. It signs the indexes
-AlgoKit requests; it does not add dummies or reshape the group. For Falcon or
-LogicSig flows that need APlane group planning, use `planGroup()` or
-`signTransactions()` before handing transactions to AlgoKit.
+The adapter connects AlgoKit clients to APlane's transaction signing functions
+and presents the AlgoKit `addr` plus `signer(txnGroup, indexesToSign)` account
+shape.
 
 ## Transaction Semantics
 

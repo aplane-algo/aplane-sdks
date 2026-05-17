@@ -275,9 +275,9 @@ const response = await client.signRequests(
 
 ### AlgoKit Utils Adapter
 
-For AlgoKit Utils 4 (utils-ts v10) transaction composers, use the adapter account. It
-implements the `addr` + `signer(txnGroup, indexesToSign)` shape and delegates
-signing to `SignerClient.signRequests()`.
+For AlgoKit Utils 4 (utils-ts v10) transaction composers, use the adapter
+account. It connects AlgoKit clients to APlane's transaction signing functions
+and presents the `addr` + `signer(txnGroup, indexesToSign)` shape.
 
 ```typescript
 import { SignerClient, createApsignerAccount } from "aplane";
@@ -292,11 +292,6 @@ const account = createApsignerAccount({
 
 algorand.setSignerFromAccount(account);
 ```
-
-The adapter signs the indexes AlgoKit requests. It does not add dummy
-transactions or reshape a group, so Falcon/LogicSig flows that need APlane
-group planning should use the native `planGroup()` / `signTransactions()` path
-before handing transactions to AlgoKit.
 
 Signing calls discover `/status.approval_wait_seconds` and use that value
 plus 30 seconds of slack for the request timeout. If discovery fails or an older

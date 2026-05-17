@@ -255,9 +255,9 @@ response = client.sign_requests(
 
 ### AlgoKit Utils Adapter
 
-For AlgoKit Utils 4 (utils-py v5) transaction composers, use the adapter account. It
-implements the `addr` + `signer(txn_group, indexes_to_sign)` shape and delegates
-signing to `SignerClient.sign_requests()`.
+For AlgoKit Utils 4 (utils-py v5) transaction composers, use the adapter
+account. It connects AlgoKit clients to APlane's transaction signing functions
+and presents the `addr` + `signer(txn_group, indexes_to_sign)` shape.
 
 ```python
 from aplane import SignerClient
@@ -272,11 +272,6 @@ account = create_apsigner_account(
 
 algorand.set_signer_from_account(account)
 ```
-
-The adapter signs the indexes AlgoKit requests. It does not add dummy
-transactions or reshape a group, so Falcon/LogicSig flows that need APlane
-group planning should use the native `plan_group()` / `sign_transactions()` path
-before handing transactions to AlgoKit.
 
 The Python AlgoKit signer is synchronous. `ApsignerAccount` tracks one active
 signing request at a time; overlapping calls on the same account raise

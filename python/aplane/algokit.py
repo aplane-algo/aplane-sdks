@@ -37,7 +37,8 @@ def _default_encode_transaction(txn: Any) -> bytes:
         from algokit_transact.codec.transaction import encode_transaction
     except ImportError as exc:
         raise SignerError(
-            "AlgoKit transaction encoder not found; install algokit-utils with algokit_transact"
+            "algokit_transact is not importable; install algokit-utils >= 5.0.0b1 "
+            "or pass an explicit encode_transaction"
         ) from exc
     return encode_transaction(txn)
 
@@ -53,10 +54,8 @@ class ApsignerAccount:
     """
     AlgoKit AddressWithTransactionSigner adapter backed by apsigner.
 
-    The adapter signs the transaction indexes AlgoKit asks it to sign. It does
-    not reshape the transaction group; Falcon or LogicSig flows that require
-    dummy insertion should use APlane's native plan/sign APIs before handing a
-    group to AlgoKit.
+    The adapter connects AlgoKit clients to APlane's transaction signing
+    functions.
     """
 
     def __init__(
@@ -113,7 +112,9 @@ class ApsignerAccount:
             return
         try:
             self._client.cancel_sign_request(request_id)
-        except Exception:
+        except (SignerError, OSError):
+            # Best-effort: backend errors and transport failures are tolerated,
+            # but programming errors (TypeError, AttributeError, ...) propagate.
             pass
 
     def _sign(self, txn_group: Sequence[Any], indexes_to_sign: Sequence[int]) -> list[bytes]:
@@ -147,10 +148,9 @@ class ApsignerAccount:
 
             result = self._client.sign_requests(requests, request_id=request_id)
 
-            if len(result.signed) != len(indexes_to_sign):
+            if len(result.signed) < len(indexes_to_sign):
                 raise SignerError(
-                    "apsigner returned a different number of signed transactions "
-                    "than AlgoKit requested"
+                    "apsigner returned fewer signed transactions than AlgoKit requested"
                 )
 
             return [bytes.fromhex(item) for item in result.signed]

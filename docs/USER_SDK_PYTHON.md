@@ -435,12 +435,9 @@ account = create_apsigner_account(
 algorand.set_signer_from_account(account)
 ```
 
-The adapter implements the AlgoKit `addr` plus
-`signer(txn_group, indexes_to_sign)` shape and delegates to
-`SignerClient.sign_requests()`, the raw `/sign` SDK method. It signs the indexes
-AlgoKit requests; it does not add dummies or reshape the group. For Falcon or
-LogicSig flows that need APlane group planning, use `plan_group()` or
-`sign_transactions()` before handing transactions to AlgoKit.
+The adapter connects AlgoKit clients to APlane's transaction signing functions
+and presents the AlgoKit `addr` plus `signer(txn_group, indexes_to_sign)`
+account shape.
 
 The Python AlgoKit signer callback is synchronous. `ApsignerAccount` exposes
 `cancel()` as the cancellation side channel and rejects overlapping sign calls

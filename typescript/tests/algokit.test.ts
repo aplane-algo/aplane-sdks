@@ -103,7 +103,7 @@ describe("AlgoKit adapter", () => {
     assert.equal(typeof account.signer, "function");
   });
 
-  it("rejects signer responses that reshape the AlgoKit group", async () => {
+  it("allows signer responses with additional APlane-managed transactions", async () => {
     const client = new MockSignerClient();
     client.signRequests = async (requests, options) => {
       client.signCalls.push({ requests, options });
@@ -115,9 +115,32 @@ describe("AlgoKit adapter", () => {
       encodeTransaction: () => new Uint8Array([84, 88]),
     });
 
+    const signed = await account.signer([{ sender: { toString: () => zeroAddress } }], [0]);
+
+    assert.deepEqual(signed, [new Uint8Array([0xaa, 0xbb]), new Uint8Array([0xcc, 0xdd])]);
+  });
+
+  it("rejects signer responses with too few signed transactions", async () => {
+    const client = new MockSignerClient();
+    client.signRequests = async (requests, options) => {
+      client.signCalls.push({ requests, options });
+      return { signed: ["aabb"] };
+    };
+    const account = createApsignerAccount({
+      client,
+      address: zeroAddress,
+      encodeTransaction: () => new Uint8Array([84, 88]),
+    });
+
     await assert.rejects(
-      account.signer([{ sender: { toString: () => zeroAddress } }], [0]),
-      /different number of signed transactions/,
+      account.signer(
+        [
+          { sender: { toString: () => zeroAddress } },
+          { sender: { toString: () => zeroAddress } },
+        ],
+        [0, 1],
+      ),
+      /fewer signed transactions/,
     );
   });
 });

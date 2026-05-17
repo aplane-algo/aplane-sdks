@@ -117,10 +117,7 @@ function txnSender(txn: AlgoKitTransaction): string {
 /**
  * AlgoKit AddressWithTransactionSigner adapter backed by apsigner.
  *
- * The adapter signs the transaction indexes AlgoKit asks it to sign. It does
- * not reshape the transaction group; Falcon or LogicSig flows that require
- * dummy insertion should use APlane's native plan/sign APIs before handing a
- * group to AlgoKit.
+ * The adapter connects AlgoKit clients to APlane's transaction signing functions.
  */
 export class ApsignerAlgoKitAccount implements ApsignerAccount {
   readonly addr: AlgoKitAddress;
@@ -186,9 +183,9 @@ export class ApsignerAlgoKitAccount implements ApsignerAccount {
     );
 
     const signed = response.signed ?? [];
-    if (signed.length !== indexesToSign.length) {
+    if (signed.length < indexesToSign.length) {
       throw new SignerError(
-        "apsigner returned a different number of signed transactions than AlgoKit requested",
+        "apsigner returned fewer signed transactions than AlgoKit requested",
       );
     }
 

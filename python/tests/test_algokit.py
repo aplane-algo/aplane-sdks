@@ -163,17 +163,68 @@ def test_concurrent_signing_is_rejected() -> None:
     assert errors == []
 
 
-def test_rejects_reshaped_signer_response() -> None:
-    class ReshapingClient(MockSignerClient):
+def test_empty_indexes_returns_empty_without_calling_client() -> None:
+    client = MockSignerClient()
+    account = ApsignerAccount(client, "ADDR", encode_transaction=lambda _txn: b"TX")
+
+    assert account.signer([MockTxn("ADDR")], []) == []
+    assert client.sign_calls == []
+
+
+def test_encoder_failure_clears_in_flight_slot() -> None:
+    client = MockSignerClient()
+    calls = {"n": 0}
+
+    def flaky_encoder(_txn: object) -> bytes:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("encoder boom")
+        return b"TX"
+
+    def sign_one(requests, *, request_id=None):
+        client.sign_calls.append((requests, request_id))
+        return GroupSignResponse(signed=["aabb"])
+
+    client.sign_requests = sign_one
+    account = ApsignerAccount(client, "ADDR", encode_transaction=flaky_encoder)
+
+    with pytest.raises(RuntimeError, match="encoder boom"):
+        account.signer([MockTxn("ADDR")], [0])
+
+    # The previous failure must not leave a stuck in-flight request id;
+    # a follow-up sign call should succeed normally.
+    signed = account.signer([MockTxn("ADDR")], [0])
+    assert signed == [bytes.fromhex("aabb")]
+
+
+def test_allows_expanded_signer_response() -> None:
+    class ExpandingClient(MockSignerClient):
         def sign_requests(self, requests, *, request_id=None):
             self.sign_calls.append((requests, request_id))
             return GroupSignResponse(signed=["aabb", "ccdd"])
 
     account = ApsignerAccount(
-        ReshapingClient(),
+        ExpandingClient(),
         "ADDR",
         encode_transaction=lambda _txn: b"TX",
     )
 
-    with pytest.raises(SignerError, match="different number"):
-        account.signer([MockTxn("ADDR")], [0])
+    signed = account.signer([MockTxn("ADDR")], [0])
+
+    assert signed == [bytes.fromhex("aabb"), bytes.fromhex("ccdd")]
+
+
+def test_rejects_too_few_signer_responses() -> None:
+    class ShortClient(MockSignerClient):
+        def sign_requests(self, requests, *, request_id=None):
+            self.sign_calls.append((requests, request_id))
+            return GroupSignResponse(signed=["aabb"])
+
+    account = ApsignerAccount(
+        ShortClient(),
+        "ADDR",
+        encode_transaction=lambda _txn: b"TX",
+    )
+
+    with pytest.raises(SignerError, match="fewer signed transactions"):
+        account.signer([MockTxn("1"), MockTxn("2")], [0, 1])
