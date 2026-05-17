@@ -15,6 +15,12 @@ pip install aplane
 
 The published package is `aplane` on PyPI.
 
+For the AlgoKit adapter, install AlgoKit Utils in the same environment:
+
+```bash
+pip install 'algokit-utils>=5.0.0b1'
+```
+
 Or install from source:
 
 ```bash
@@ -259,19 +265,46 @@ For AlgoKit Utils 4 (utils-py v5) transaction composers, use the adapter
 account. It connects AlgoKit clients to APlane's transaction signing functions
 and presents the `addr` + `signer(txn_group, indexes_to_sign)` shape.
 
+The minimal repository example is `examples/algokit_self_send.py`. From a
+checkout, run it as a module so it imports the local SDK source:
+
+```bash
+cd ~/aplane-sdks/python
+export APCLIENT_DATA=~/aplane/apclient
+export APLANE_ADDRESS=SENDER_ADDRESS
+python -m examples.algokit_self_send
+```
+
+The example builds a transaction with AlgoKit, signs it through the APlane
+adapter, then submits the signed blobs with AlgoKit's algod client:
+
 ```python
+from algokit_utils import AlgoAmount, AlgorandClient, PaymentParams
 from aplane import SignerClient
 from aplane.algokit import create_apsigner_account
 
-client = SignerClient.from_env()
-account = create_apsigner_account(
-    client,
-    "SENDER_ADDRESS",
-    auth_address="SIGNER_KEY_ADDRESS",  # omit when not rekeyed
-)
+sender = "SENDER_ADDRESS"
+algorand = AlgorandClient.testnet()
 
-algorand.set_signer_from_account(account)
+with SignerClient.from_env() as signer:
+    auth = algorand.client.algod.account_information(sender).auth_addr or sender
+    account = create_apsigner_account(signer, sender, auth_address=auth)
+    txn = algorand.create_transaction.payment(
+        PaymentParams(
+            sender=sender,
+            signer=account,
+            receiver=sender,
+            amount=AlgoAmount(micro_algo=0),
+            validity_window=1000,
+        )
+    )
+    signed = account.signer([txn], [0])
+    tx_id = algorand.client.algod.send_raw_transaction(signed).tx_id
 ```
+
+Use `create_transaction.*` when APlane must own final signing and any
+APlane-managed group expansion. `algorand.send.*` owns the composer send path
+and signs inside that path.
 
 The Python AlgoKit signer is synchronous. `ApsignerAccount` tracks one active
 signing request at a time; overlapping calls on the same account raise
