@@ -13,6 +13,13 @@ compatible APlane release tags and may skip product release numbers.
 npm install aplane algosdk
 ```
 
+For the AlgoKit adapter example/client helpers, install AlgoKit Utils 4 in the
+same project:
+
+```bash
+npm install "@algorandfoundation/algokit-utils@^10.0.0-beta.2"
+```
+
 Or with yarn/pnpm:
 
 ```bash
@@ -275,23 +282,54 @@ const response = await client.signRequests(
 
 ### AlgoKit Utils Adapter
 
-For AlgoKit Utils 4 (utils-ts v10) transaction composers, use the adapter
+For AlgoKit Utils 4 (utils-ts v10) transaction signing, use the adapter
 account. It connects AlgoKit clients to APlane's transaction signing functions
 and presents the `addr` + `signer(txnGroup, indexesToSign)` shape.
 
+The minimal repository example is `examples/algokit_self_send.ts`. From a
+checkout with dependencies installed and the SDK built:
+
+```bash
+cd ~/aplane-sdks/typescript
+npm install
+npm install --no-save "@algorandfoundation/algokit-utils@^10.0.0-beta.2"
+npm run build
+export APCLIENT_DATA=~/aplane/apclient
+export APLANE_ADDRESS=SENDER_ADDRESS
+node --import tsx examples/algokit_self_send.ts
+```
+
+The example builds a transaction with AlgoKit, signs it through the APlane
+adapter, then submits the signed blobs with AlgoKit's algod client:
+
 ```typescript
+import { AlgorandClient, microAlgo } from "@algorandfoundation/algokit-utils";
 import { SignerClient, createApsignerAccount } from "aplane";
 
-const client = await SignerClient.fromEnv();
-const account = createApsignerAccount({
-  client,
-  address: "SENDER_ADDRESS",
-  authAddress: "SIGNER_KEY_ADDRESS", // omit when not rekeyed
-  newRequestId: () => crypto.randomUUID(), // optional caller-owned per-call ID
-});
+const sender = "SENDER_ADDRESS";
+const algorand = AlgorandClient.testNet();
+const signer = await SignerClient.fromEnv();
 
-algorand.setSignerFromAccount(account);
+const info = await algorand.account.getInformation(sender);
+const account = createApsignerAccount({
+  client: signer,
+  address: sender,
+  authAddress: info.authAddr?.toString() ?? sender,
+});
+const txn = await algorand.createTransaction.payment({
+  sender,
+  signer: account,
+  receiver: sender,
+  amount: microAlgo(0),
+  validityWindow: 1000,
+});
+const signed = await account.signer([txn], [0]);
+const txId = (await algorand.client.algod.sendRawTransaction(signed)).txId;
 ```
+
+Use `createTransaction.*` when APlane must own final signing and any
+APlane-managed group expansion. `algorand.send.*` owns the composer send path
+and signs inside that path.
 
 Signing calls discover `/status.approval_wait_seconds` and use that value
 plus 30 seconds of slack for the request timeout. If discovery fails or an older

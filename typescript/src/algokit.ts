@@ -34,6 +34,10 @@ export type AlgoKitTransactionEncoder = (
   txn: AlgoKitTransaction,
 ) => Uint8Array | Promise<Uint8Array>;
 
+type AlgoKitEncoderModule = {
+  encodeTransaction?: AlgoKitTransactionEncoder;
+};
+
 export interface ApsignerAccountOptions {
   /** Native APlane signer client. */
   client: RequestsSignerClient;
@@ -91,16 +95,27 @@ async function dynamicImport<T>(specifier: string): Promise<T> {
   return importer(specifier);
 }
 
+async function loadAlgoKitEncoder(
+  specifier: string,
+): Promise<AlgoKitTransactionEncoder | undefined> {
+  try {
+    const mod = await dynamicImport<AlgoKitEncoderModule>(specifier);
+    return typeof mod.encodeTransaction === "function" ? mod.encodeTransaction : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function defaultEncodeAlgoKitTransaction(txn: AlgoKitTransaction): Promise<Uint8Array> {
-  const mod = await dynamicImport<{ encodeTransaction?: (txn: unknown) => Uint8Array }>(
-    "@algorandfoundation/algokit-transact",
-  );
-  if (typeof mod.encodeTransaction !== "function") {
+  const encodeTransaction =
+    await loadAlgoKitEncoder("@algorandfoundation/algokit-utils/transact")
+    ?? await loadAlgoKitEncoder("@algorandfoundation/algokit-transact");
+  if (!encodeTransaction) {
     throw new SignerError(
-      "AlgoKit transaction encoder not found; install @algorandfoundation/algokit-transact",
+      "AlgoKit transaction encoder not found; install @algorandfoundation/algokit-utils@10 or pass encodeTransaction",
     );
   }
-  return mod.encodeTransaction(txn);
+  return encodeTransaction(txn);
 }
 
 function txnSender(txn: AlgoKitTransaction): string {
