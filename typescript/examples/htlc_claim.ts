@@ -46,9 +46,9 @@ async function main() {
 
     // Discover required arguments for this LogicSig
     const keyInfo = await signer.getKeyInfo(HASHLOCK_ADDRESS);
-    if (keyInfo?.runtimeArgs) {
+    if (keyInfo?.signingArgs) {
       console.log("Required arguments for this LogicSig:");
-      for (const arg of keyInfo.runtimeArgs) {
+      for (const arg of keyInfo.signingArgs) {
         console.log(`  - ${arg.name}: ${arg.type} (${arg.description})`);
       }
     }

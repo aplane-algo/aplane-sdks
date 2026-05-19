@@ -311,7 +311,7 @@ for (const key of keys) {
 - `keyType`
 - `lsigSize`
 - `isGenericLsig`
-- `runtimeArgs`
+- `signingArgs`
 - `templateStatus`
 - `templateWarning`
 

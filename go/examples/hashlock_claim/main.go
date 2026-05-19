@@ -68,9 +68,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to get key info: %v", err)
 	}
-	if keyInfo != nil && len(keyInfo.RuntimeArgs) > 0 {
+	if keyInfo != nil && len(keyInfo.SigningArgs) > 0 {
 		fmt.Println("Required arguments for this LogicSig:")
-		for _, arg := range keyInfo.RuntimeArgs {
+		for _, arg := range keyInfo.SigningArgs {
 			fmt.Printf("  - %s: %s (%s)\n", arg.Name, arg.Type, arg.Description)
 		}
 	}

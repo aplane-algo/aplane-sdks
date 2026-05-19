@@ -21,6 +21,11 @@ export interface RuntimeArg {
 }
 
 /**
+ * Key-file-owned signing argument metadata returned from /keys.
+ */
+export type SigningArg = RuntimeArg;
+
+/**
  * Information about a signing key from the signer.
  */
 export interface KeyInfo {
@@ -34,8 +39,8 @@ export interface KeyInfo {
   lsigSize: number;
   /** True if this is a generic LogicSig (no cryptographic signature needed) */
   isGenericLsig: boolean;
-  /** Runtime arguments for generic LogicSigs */
-  runtimeArgs?: RuntimeArg[];
+  /** Key-file-owned signing arguments for LogicSigs */
+  signingArgs?: SigningArg[];
   /** Template provenance status, when the signer reports one */
   templateStatus?: string;
   /** Human-readable template provenance warning */

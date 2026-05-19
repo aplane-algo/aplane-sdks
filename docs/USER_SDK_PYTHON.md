@@ -300,7 +300,7 @@ Useful `KeyInfo` fields include:
 - `public_key_hex`
 - `lsig_size`
 - `is_generic_lsig`
-- `runtime_args`
+- `signing_args`
 - `template_status`
 - `template_warning`
 

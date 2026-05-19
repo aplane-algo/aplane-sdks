@@ -25,6 +25,7 @@ import type {
   GenerateResult,
   PlanGroupResponse,
   RuntimeArg,
+  SigningArg,
   MutationReport,
   CancelSignResponse,
 } from "./types.js";
@@ -625,13 +626,13 @@ export class SignerClient {
     const keys: KeyInfo[] = [];
 
     for (const k of data.keys || []) {
-      // Parse runtime_args, mapping snake_case API fields to camelCase TypeScript
-      let runtimeArgs: RuntimeArg[] | undefined;
+      // Parse signing_args, mapping snake_case API fields to camelCase TypeScript
+      let signingArgs: SigningArg[] | undefined;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rawArgs = (k as any).runtime_args;
+      const rawArgs = (k as any).signing_args;
       if (rawArgs) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        runtimeArgs = rawArgs.map((arg: any) => ({
+        signingArgs = rawArgs.map((arg: any) => ({
           name: arg.name,
           type: arg.type || "bytes",
           description: arg.description || "",
@@ -650,7 +651,7 @@ export class SignerClient {
         keyType: raw.key_type || "",
         lsigSize: raw.lsig_size || 0,
         isGenericLsig: raw.is_generic_lsig || false,
-        runtimeArgs,
+        signingArgs,
         templateStatus: raw.template_status,
         templateWarning: raw.template_warning,
       };

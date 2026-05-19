@@ -240,6 +240,10 @@ type RuntimeArg struct {
 // older runtime-argument name.
 type RuntimeArgInfo = RuntimeArg
 
+// SigningArg describes a key-file-owned signing argument returned from /keys.
+// It has the same shape as RuntimeArg but a different authority.
+type SigningArg = RuntimeArg
+
 // CreationParam describes a parameter for key generation.
 type CreationParam struct {
 	Name        string  `json:"name"`
@@ -278,7 +282,7 @@ type KeyInfo struct {
 	KeyType         string       `json:"key_type"`
 	LsigSize        int          `json:"lsig_size,omitempty"`
 	IsGenericLsig   bool         `json:"is_generic_lsig,omitempty"`
-	RuntimeArgs     []RuntimeArg `json:"runtime_args,omitempty"`
+	SigningArgs     []SigningArg `json:"signing_args,omitempty"`
 	TemplateStatus  string       `json:"template_status,omitempty"`
 	TemplateWarning string       `json:"template_warning,omitempty"`
 }

@@ -51,6 +51,7 @@ from .signer import (
 
     # Types
     RuntimeArg,
+    SigningArg,
     KeyInfo,
     SSHConfig,
     ClientConfig,
@@ -93,6 +94,7 @@ __all__ = [
 
     # Types
     "RuntimeArg",
+    "SigningArg",
     "KeyInfo",
     "SSHConfig",
     "ClientConfig",

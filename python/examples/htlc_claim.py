@@ -47,9 +47,9 @@ def main():
 
         # Discover required arguments for this LogicSig
         key_info = signer.get_key_info(HASHLOCK_ADDRESS)
-        if key_info and key_info.runtime_args:
+        if key_info and key_info.signing_args:
             print("Required arguments for this LogicSig:")
-            for arg in key_info.runtime_args:
+            for arg in key_info.signing_args:
                 print(f"  - {arg.name}: {arg.arg_type} ({arg.description})")
 
         # Build claim transaction (send all funds to recipient)

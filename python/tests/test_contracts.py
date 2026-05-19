@@ -98,11 +98,11 @@ def test_list_keys_maps_generic_lsig_metadata():
     assert generic.key_type == "aplane.timelock.v1"
     assert generic.lsig_size == 512
     assert generic.is_generic_lsig is True
-    assert generic.runtime_args is not None
-    assert generic.runtime_args[0].name == "preimage"
-    assert generic.runtime_args[0].label == "Preimage"
-    assert generic.runtime_args[0].required is True
-    assert generic.runtime_args[0].byte_length == 32
+    assert generic.signing_args is not None
+    assert generic.signing_args[0].name == "preimage"
+    assert generic.signing_args[0].label == "Preimage"
+    assert generic.signing_args[0].required is True
+    assert generic.signing_args[0].byte_length == 32
 
 
 def test_list_key_types_maps_creation_and_runtime_metadata():

@@ -252,7 +252,7 @@ for _, key := range keys {
 - `KeyType`
 - `LsigSize`
 - `IsGenericLsig`
-- `RuntimeArgs`
+- `SigningArgs`
 - `TemplateStatus`
 - `TemplateWarning`
 

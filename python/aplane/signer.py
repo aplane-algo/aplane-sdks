@@ -174,6 +174,10 @@ class RuntimeArg:
     byte_length: int = 0
 
 
+# /keys exposes key-file-owned signing_args with the same item shape.
+SigningArg = RuntimeArg
+
+
 @dataclass
 class KeyInfo:
     """Information about a signing key"""
@@ -182,7 +186,7 @@ class KeyInfo:
     public_key_hex: str = ""
     lsig_size: int = 0
     is_generic_lsig: bool = False
-    runtime_args: Optional[List[RuntimeArg]] = None  # Args required for generic LogicSigs
+    signing_args: Optional[List[SigningArg]] = None  # Key-file args required for LogicSigs
     template_status: str = ""
     template_warning: str = ""
 
@@ -910,10 +914,10 @@ class SignerClient:
         self._key_cache.clear()
         keys = []
         for k in data.get("keys", []):
-            # Parse runtime_args if present
-            runtime_args = None
-            if k.get("runtime_args"):
-                runtime_args = [
+            # Parse signing_args if present
+            signing_args = None
+            if k.get("signing_args"):
+                signing_args = [
                     RuntimeArg(
                         name=arg["name"],
                         arg_type=arg.get("type", "bytes"),
@@ -922,7 +926,7 @@ class SignerClient:
                         required=arg.get("required", False),
                         byte_length=arg.get("byte_length", 0),
                     )
-                    for arg in k["runtime_args"]
+                    for arg in k["signing_args"]
                 ]
 
             key_info = KeyInfo(
@@ -931,7 +935,7 @@ class SignerClient:
                 public_key_hex=k.get("public_key_hex", ""),
                 lsig_size=k.get("lsig_size", 0),
                 is_generic_lsig=k.get("is_generic_lsig", False),
-                runtime_args=runtime_args,
+                signing_args=signing_args,
                 template_status=k.get("template_status", ""),
                 template_warning=k.get("template_warning", ""),
             )

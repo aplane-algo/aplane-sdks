@@ -200,14 +200,14 @@ Returns list of `KeyInfo`:
 - `keyType`: "ed25519", "aplane.falcon1024.v1", "aplane.timelock.v1", etc.
 - `lsigSize`: LogicSig size (for budget calculation)
 - `isGenericLsig`: True if no cryptographic signature needed
-- `runtimeArgs`: List of `RuntimeArg` for generic LogicSigs
+- `signingArgs`: List of `SigningArg` for LogicSigs
 
 **Discovering required arguments for generic LogicSigs:**
 
 ```typescript
 const keyInfo = await client.getKeyInfo(hashlockAddress);
-if (keyInfo?.runtimeArgs) {
-  for (const arg of keyInfo.runtimeArgs) {
+if (keyInfo?.signingArgs) {
+  for (const arg of keyInfo.signingArgs) {
     console.log(`${arg.name}: ${arg.type} - ${arg.description}`);
   }
 }
@@ -369,7 +369,7 @@ controller.abort();
 | `ed25519` | Native Algorand keys | Standard signing |
 | `aplane.falcon1024.v1` | Post-quantum LogicSig | Signature in LogicSig.Args[0] |
 | `aplane.timelock.v1` | Time-locked funds | No signature, TEAL-only |
-| `aplane.htlc.v*` | Hash-locked funds | Requires `preimage` arg (check `runtimeArgs`) |
+| `aplane.htlc.v*` | Hash-locked funds | Requires `preimage` arg (check `signingArgs`) |
 
 The server assembles the complete signed transaction - the SDK returns a base64 string ready for submission.
 

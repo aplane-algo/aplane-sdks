@@ -181,14 +181,14 @@ Returns list of `KeyInfo`:
 - `key_type`: "ed25519", "aplane.falcon1024.v1", "aplane.timelock.v1", etc.
 - `lsig_size`: LogicSig size (for budget calculation)
 - `is_generic_lsig`: True if no cryptographic signature needed
-- `runtime_args`: List of `RuntimeArg` for generic LogicSigs (name, arg_type, description)
+- `signing_args`: List of `SigningArg` for LogicSigs (name, arg_type, description)
 
 **Discovering required arguments for generic LogicSigs:**
 
 ```python
 key_info = client.get_key_info(hashlock_address)
-if key_info.runtime_args:
-    for arg in key_info.runtime_args:
+if key_info.signing_args:
+    for arg in key_info.signing_args:
         print(f"{arg.name}: {arg.arg_type} - {arg.description}")
 ```
 
@@ -360,7 +360,7 @@ client.close()
 | `ed25519` | Native Algorand keys | Standard signing |
 | `aplane.falcon1024.v*` | Post-quantum LogicSig | Signature in LogicSig.Args[0] |
 | `aplane.timelock.v*` | Time-locked funds | No signature, TEAL-only |
-| `aplane.htlc.v*` | Hash-locked funds | Requires `preimage` arg (check `runtime_args`) |
+| `aplane.htlc.v*` | Hash-locked funds | Requires `preimage` arg (check `signing_args`) |
 
 The server assembles the complete signed transaction - the SDK returns a base64 string ready for submission.
 

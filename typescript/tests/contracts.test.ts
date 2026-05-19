@@ -131,10 +131,10 @@ describe("signer API contract fixtures", () => {
     assert.equal(keys[1].keyType, "aplane.timelock.v1");
     assert.equal(keys[1].lsigSize, 512);
     assert.equal(keys[1].isGenericLsig, true);
-    assert.equal(keys[1].runtimeArgs?.[0].name, "preimage");
-    assert.equal(keys[1].runtimeArgs?.[0].label, "Preimage");
-    assert.equal(keys[1].runtimeArgs?.[0].required, true);
-    assert.equal(keys[1].runtimeArgs?.[0].byteLength, 32);
+    assert.equal(keys[1].signingArgs?.[0].name, "preimage");
+    assert.equal(keys[1].signingArgs?.[0].label, "Preimage");
+    assert.equal(keys[1].signingArgs?.[0].required, true);
+    assert.equal(keys[1].signingArgs?.[0].byteLength, 32);
   });
 
   it("maps /keytypes wire fields to public KeyTypeInfo fields", async () => {

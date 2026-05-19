@@ -12,7 +12,7 @@
       "key_type": "aplane.timelock.v1",
       "lsig_size": 512,
       "is_generic_lsig": true,
-      "runtime_args": [
+      "signing_args": [
         {
           "name": "preimage",
           "type": "bytes",
