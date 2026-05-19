@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Minimal AlgoKit Utils example using an apsigner-backed account."""
 
 import os
 
@@ -11,16 +12,23 @@ sender = os.environ["APLANE_ADDRESS"]
 algorand = AlgorandClient.testnet()
 
 with SignerClient.from_env() as signer:
-    auth = algorand.client.algod.account_information(sender).auth_addr or sender
-    account = create_apsigner_account(signer, sender, auth_address=auth)
+    account_info = algorand.account.get_information(sender)
+    account = create_apsigner_account(
+        signer,
+        sender,
+        auth_address=account_info.auth_addr or sender,
+    )
+
     txn = algorand.create_transaction.payment(
         PaymentParams(
-            sender=sender,
+            sender=account.addr,
             signer=account,
-            receiver=sender,
-            amount=AlgoAmount(micro_algo=0),
+            receiver=account.addr,
+            amount=AlgoAmount.from_micro_algo(0),
             validity_window=1000,
         )
     )
-    signed = account.signer([txn], [0])
-    print(algorand.client.algod.send_raw_transaction(signed).tx_id)
+
+    signed_txns = account.signer([txn], [0])
+    response = algorand.client.algod.send_raw_transaction(signed_txns)
+    print(response.tx_id)
