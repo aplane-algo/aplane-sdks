@@ -19,10 +19,120 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
+  package-release-assets:
+    name: Build GitHub release packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag }}
+
+      - name: Derive package version
+        env:
+          SDK_TAG: ${{ inputs.tag }}
+        run: |
+          VERSION="${SDK_TAG#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "$SDK_TAG" ]; then
+            echo "tag must start with v, got: $SDK_TAG" >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Set Python package version from tag
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ["VERSION"]
+          path = Path("python/aplane/_version.py")
+          text = path.read_text(encoding="utf-8")
+          updated, count = re.subn(
+              r'(?m)^__version__ = "[^"]+"$',
+              f'__version__ = "{version}"',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("failed to update python/aplane/_version.py version")
+          path.write_text(updated, encoding="utf-8")
+          print(f"Set Python SDK version to {version}")
+          PY
+
+      - name: Build Python packages
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+        working-directory: python
+
+      - name: Set TypeScript package version from tag
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+          const version = process.env.VERSION;
+          for (const file of ["package.json", "package-lock.json"]) {
+            const data = JSON.parse(fs.readFileSync(file, "utf8"));
+            data.version = version;
+            if (data.packages && data.packages[""]) {
+              data.packages[""].version = version;
+            }
+            fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+          }
+          console.log(`Set TypeScript SDK version to ${version}`);
+          NODE
+        working-directory: typescript
+
+      - name: Build TypeScript package
+        run: |
+          npm ci
+          npm pack
+        working-directory: typescript
+
+      - name: Build Go SDK source archive
+        run: |
+          mkdir -p release-assets
+          git archive \
+            --format=tar.gz \
+            --prefix="aplane-go-sdk-$VERSION/" \
+            --output="release-assets/aplane-go-sdk-$VERSION.tar.gz" \
+            HEAD:go
+
+      - name: Collect release assets
+        run: |
+          mkdir -p release-assets
+          cp python/dist/* release-assets/
+          cp typescript/*.tgz release-assets/
+          ls -lh release-assets
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SDK_TAG: ${{ inputs.tag }}
+        run: |
+          if gh release view "$SDK_TAG" >/dev/null 2>&1; then
+            gh release upload "$SDK_TAG" release-assets/* --clobber
+          else
+            gh release create "$SDK_TAG" release-assets/* \
+              --title "$SDK_TAG" \
+              --notes "SDK release packages for $SDK_TAG"
+          fi
+
   publish-pypi:
     name: Publish Python SDK to PyPI
     if: ${{ inputs.publish_python }}
