@@ -106,6 +106,7 @@ func TestGoSDKContractFixturesRoundTrip(t *testing.T) {
 		{"cancel_sign_request.json", assertSDKContractRoundTrip[CancelSignRequest]},
 		{"cancel_sign_response_not_found.json", assertSDKContractRoundTrip[CancelSignResponse]},
 		{"cancel_sign_response_success.json", assertSDKContractRoundTrip[CancelSignResponse]},
+		{"error_response.json", assertSDKContractRoundTrip[ErrorResponse]},
 		{"health_response_ready.json", assertSDKContractRoundTrip[HealthResponse]},
 		{"status_response_ready.json", assertSDKContractRoundTrip[StatusResponse]},
 	}

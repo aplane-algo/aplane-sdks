@@ -28,6 +28,7 @@ import type {
   SigningArg,
   MutationReport,
   CancelSignResponse,
+  ErrorResponse,
 } from "./types.js";
 import {
   SignerError,
@@ -528,10 +529,12 @@ export class SignerClient {
       throw new AuthenticationError();
     }
     if (response.status === 503) {
-      throw new SignerUnavailableError("Signer unavailable");
+      throw new SignerUnavailableError(await this.errorMessage(response, "Signer unavailable"));
     }
     if (response.status !== 200) {
-      throw new SignerError(`Failed to get signer status: HTTP ${response.status}`);
+      throw new SignerError(
+        await this.errorMessage(response, `Failed to get signer status: HTTP ${response.status}`)
+      );
     }
 
     const data = (await response.json()) as Record<string, unknown>;
@@ -619,7 +622,9 @@ export class SignerClient {
     }
 
     if (response.status !== 200) {
-      throw new SignerError(`Failed to list keys: HTTP ${response.status}`);
+      throw new SignerError(
+        await this.errorMessage(response, `Failed to list keys: HTTP ${response.status}`)
+      );
     }
 
     const data = (await response.json()) as KeysResponse;
@@ -690,7 +695,9 @@ export class SignerClient {
       throw new AuthenticationError();
     }
     if (response.status !== 200) {
-      throw new SignerError(`Failed to list key types: HTTP ${response.status}`);
+      throw new SignerError(
+        await this.errorMessage(response, `Failed to list key types: HTTP ${response.status}`)
+      );
     }
 
     const data = (await response.json()) as KeyTypesResponse;
@@ -787,11 +794,12 @@ export class SignerClient {
       throw new SignerUnavailableError("Signer is locked");
     }
     if (response.status === 400) {
-      const data = await this.safeJson(response);
-      throw new SignerError(String(data.error || "Bad request"));
+      throw new SignerError(await this.errorMessage(response, "Bad request"));
     }
     if (response.status !== 200) {
-      throw new SignerError(`Key generation failed: HTTP ${response.status}`);
+      throw new SignerError(
+        await this.errorMessage(response, `Key generation failed: HTTP ${response.status}`)
+      );
     }
 
     const data = (await response.json()) as Record<string, unknown>;
@@ -827,12 +835,12 @@ export class SignerClient {
       throw new SignerUnavailableError("Signer is locked");
     }
     if (response.status === 404) {
-      const data = await this.safeJson(response);
-      throw new KeyDeletionError(String(data.error || `Key not found: ${address}`));
+      throw new KeyDeletionError(await this.errorMessage(response, `Key not found: ${address}`));
     }
     if (response.status !== 200) {
-      const data = await this.safeJson(response);
-      throw new SignerError(String(data.error || `Key deletion failed: HTTP ${response.status}`));
+      throw new SignerError(
+        await this.errorMessage(response, `Key deletion failed: HTTP ${response.status}`)
+      );
     }
 
     const data = await this.safeJson(response);
@@ -862,8 +870,9 @@ export class SignerClient {
       throw new AuthenticationError();
     }
     if (response.status !== 200) {
-      const data = await this.safeJson(response);
-      throw new SignerError(String(data.error || `Sign cancel failed: HTTP ${response.status}`));
+      throw new SignerError(
+        await this.errorMessage(response, `Sign cancel failed: HTTP ${response.status}`)
+      );
     }
 
     const data = (await response.json()) as CancelSignResponse;
@@ -923,19 +932,17 @@ export class SignerClient {
       throw new AuthenticationError();
     }
     if (response.status === 400) {
-      const data = await this.safeJson(response);
-      const error = String(data.error || "");
+      const error = await this.errorMessage(response, "");
       if (error.toLowerCase().includes("not found")) {
         throw new KeyNotFoundError(error);
       }
       throw new SignerError(`Bad request: ${error}`);
     }
     if (response.status === 403) {
-      const data = await this.safeJson(response);
-      throw new SignerError(String(data.error || "Forbidden"));
+      throw new SignerError(await this.errorMessage(response, "Forbidden"));
     }
     if (response.status !== 200) {
-      throw new SignerError(`Plan failed: HTTP ${response.status}`);
+      throw new SignerError(await this.errorMessage(response, `Plan failed: HTTP ${response.status}`));
     }
 
     let data: PlanGroupResponse;
@@ -1151,8 +1158,7 @@ export class SignerClient {
     }
 
     if (response.status === 400) {
-      const data = await this.safeJson(response);
-      const error = String(data.error || (await response.text()));
+      const error = await this.errorMessage(response, "");
       if (error.toLowerCase().includes("not found")) {
         throw new KeyNotFoundError(error);
       }
@@ -1160,19 +1166,17 @@ export class SignerClient {
     }
 
     if (response.status === 403) {
-      const data = await this.safeJson(response);
-      const error = String(data.error || "Signing request rejected by operator");
+      const error = await this.errorMessage(response, "Signing request rejected by operator");
       throw new SigningRejectedError(error);
     }
 
     if (response.status === 503) {
-      const data = await this.safeJson(response);
-      const error = String(data.error || "Signer unavailable");
+      const error = await this.errorMessage(response, "Signer unavailable");
       throw new SignerUnavailableError(error);
     }
 
     if (response.status !== 200) {
-      throw new SignerError(`Signing failed: HTTP ${response.status}`);
+      throw new SignerError(await this.errorMessage(response, `Signing failed: HTTP ${response.status}`));
     }
 
     let data: GroupSignResponse;
@@ -1314,6 +1318,35 @@ export class SignerClient {
     } catch {
       return {};
     }
+  }
+
+  /**
+   * Parse a non-2xx signer error response.
+   */
+  private async errorMessage(response: Response, fallback: string): Promise<string> {
+    try {
+      const jsonResponse =
+        typeof response.clone === "function" ? response.clone() : response;
+      const data = (await jsonResponse.json()) as Partial<ErrorResponse>;
+      if (typeof data.error === "string" && data.error.trim() !== "") {
+        return data.error;
+      }
+    } catch {
+      // Fall through to text/fallback handling.
+    }
+
+    try {
+      const textResponse =
+        typeof response.clone === "function" ? response.clone() : response;
+      const text = (await textResponse.text()).trim();
+      if (text !== "") {
+        return text;
+      }
+    } catch {
+      // Fall through to fallback.
+    }
+
+    return fallback;
   }
 
   /**

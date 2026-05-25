@@ -851,6 +851,23 @@ func TestSign_ServerError(t *testing.T) {
 	}
 }
 
+func TestSign_ServerJSONError(t *testing.T) {
+	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "policy engine unavailable"})
+	})
+	defer server.Close()
+
+	txn := types.Transaction{Type: types.PaymentTx}
+	_, err := client.SignTransaction(txn, "ADDR", nil)
+	if err == nil || !strings.Contains(err.Error(), "policy engine unavailable") {
+		t.Fatalf("expected JSON error body, got: %v", err)
+	}
+	if strings.Contains(err.Error(), `{"error"`) {
+		t.Fatalf("expected parsed JSON error message, got: %v", err)
+	}
+}
+
 func TestSign_ResponseError(t *testing.T) {
 	client, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(GroupSignResponse{Error: "key not found"})

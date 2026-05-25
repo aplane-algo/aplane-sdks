@@ -353,6 +353,13 @@ export interface GroupSignResponse {
 }
 
 /**
+ * Standard signer HTTP error body for non-2xx responses.
+ */
+export interface ErrorResponse {
+  error: string;
+}
+
+/**
  * Response from the /keys endpoint.
  */
 export interface KeysResponse {

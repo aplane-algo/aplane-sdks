@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -78,11 +79,20 @@ func (c *SignerClient) SetHTTPClient(client *http.Client) {
 }
 
 func readErrorBody(resp *http.Response) string {
-	body, err := io.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Sprintf("<failed to read error body: %v>", err)
 	}
-	return string(body)
+	body := strings.TrimSpace(string(bodyBytes))
+	if body == "" {
+		return http.StatusText(resp.StatusCode)
+	}
+
+	var errorResp ErrorResponse
+	if err := json.Unmarshal(bodyBytes, &errorResp); err == nil && errorResp.Error != "" {
+		return errorResp.Error
+	}
+	return body
 }
 
 func (c *SignerClient) requestContext(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {

@@ -61,6 +61,7 @@ from .signer import (
     StatusResponse,
     CancelSignResponse,
     GroupSignResponse,
+    ErrorResponse,
     GenerateResult,
 )
 
@@ -105,5 +106,6 @@ __all__ = [
     "StatusResponse",
     "CancelSignResponse",
     "GroupSignResponse",
+    "ErrorResponse",
     "GenerateResult",
 ]

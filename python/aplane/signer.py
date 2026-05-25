@@ -281,6 +281,12 @@ class GroupSignResponse:
 
 
 @dataclass
+class ErrorResponse:
+    """Standard signer HTTP error body for non-2xx responses"""
+    error: str
+
+
+@dataclass
 class GenerateResult:
     """Result of key generation"""
     address: str
@@ -833,10 +839,15 @@ class SignerClient:
             raise AuthenticationError("Invalid or missing token")
 
         if resp.status_code == 503:
-            raise SignerUnavailableError("Signer unavailable")
+            raise SignerUnavailableError(self._error_message(resp, "Signer unavailable"))
 
         if resp.status_code != 200:
-            raise SignerError(f"Failed to get signer status: HTTP {resp.status_code}")
+            raise SignerError(
+                self._error_message(
+                    resp,
+                    f"Failed to get signer status: HTTP {resp.status_code}",
+                )
+            )
 
         data = resp.json()
         identity = StatusResponse(
@@ -919,7 +930,9 @@ class SignerClient:
             raise AuthenticationError("Invalid or missing token")
 
         if resp.status_code != 200:
-            raise SignerError(f"Failed to list keys: HTTP {resp.status_code}")
+            raise SignerError(
+                self._error_message(resp, f"Failed to list keys: HTTP {resp.status_code}")
+            )
 
         data = resp.json()
         self._key_cache.clear()
@@ -988,7 +1001,12 @@ class SignerClient:
             raise AuthenticationError("Invalid or missing token")
 
         if resp.status_code != 200:
-            raise SignerError(f"Failed to list key types: HTTP {resp.status_code}")
+            raise SignerError(
+                self._error_message(
+                    resp,
+                    f"Failed to list key types: HTTP {resp.status_code}",
+                )
+            )
 
         data = resp.json()
         result = []
@@ -1088,11 +1106,12 @@ class SignerClient:
             raise SignerUnavailableError("Signer is locked")
 
         if resp.status_code == 400:
-            data = self._safe_json(resp)
-            raise SignerError(data.get("error", f"Bad request: {resp.text}"))
+            raise SignerError(self._error_message(resp, "Bad request"))
 
         if resp.status_code != 200:
-            raise SignerError(f"Key generation failed: HTTP {resp.status_code}")
+            raise SignerError(
+                self._error_message(resp, f"Key generation failed: HTTP {resp.status_code}")
+            )
 
         data = resp.json()
         if data.get("error"):
@@ -1135,12 +1154,12 @@ class SignerClient:
             raise SignerUnavailableError("Signer is locked")
 
         if resp.status_code == 404:
-            data = self._safe_json(resp)
-            raise KeyDeletionError(data.get("error", f"Key not found: {address}"))
+            raise KeyDeletionError(self._error_message(resp, f"Key not found: {address}"))
 
         if resp.status_code != 200:
-            data = self._safe_json(resp)
-            raise SignerError(data.get("error", f"Key deletion failed: HTTP {resp.status_code}"))
+            raise SignerError(
+                self._error_message(resp, f"Key deletion failed: HTTP {resp.status_code}")
+            )
 
         data = self._safe_json(resp)
         if data.get("error"):
@@ -1167,6 +1186,17 @@ class SignerClient:
         except json.JSONDecodeError:
             return {}
 
+    def _error_message(self, resp: requests.Response, fallback: str) -> str:
+        """Return signer error text from top-level JSON error, text, or fallback."""
+        data = self._safe_json(resp)
+        error = data.get("error")
+        if isinstance(error, str) and error.strip():
+            return error
+        text = (resp.text or "").strip()
+        if text:
+            return text
+        return fallback
+
     def cancel_sign_request(self, request_id: str) -> CancelSignResponse:
         """
         Ask apsigner to cancel a live synchronous /sign request.
@@ -1188,9 +1218,8 @@ class SignerClient:
             raise AuthenticationError("Invalid or missing token")
 
         if resp.status_code != 200:
-            data = self._safe_json(resp)
             raise SignerError(
-                data.get("error", f"Sign cancel failed: HTTP {resp.status_code}")
+                self._error_message(resp, f"Sign cancel failed: HTTP {resp.status_code}")
             )
 
         data = self._safe_json(resp)
@@ -1422,24 +1451,23 @@ class SignerClient:
             raise AuthenticationError("Invalid or missing token")
 
         if resp.status_code == 400:
-            data = self._safe_json(resp)
-            error = data.get("error", resp.text)
+            error = self._error_message(resp, "")
             if "not found" in error.lower():
                 raise KeyNotFoundError(error)
             raise SignerError(f"Bad request: {error}")
 
         if resp.status_code == 403:
-            data = self._safe_json(resp)
-            error = data.get("error", "Signing request rejected by operator")
+            error = self._error_message(resp, "Signing request rejected by operator")
             raise SigningRejectedError(error)
 
         if resp.status_code == 503:
-            data = self._safe_json(resp)
-            error = data.get("error", "Signer unavailable")
+            error = self._error_message(resp, "Signer unavailable")
             raise SignerUnavailableError(error)
 
         if resp.status_code != 200:
-            raise SignerError(f"Signing failed: HTTP {resp.status_code}")
+            raise SignerError(
+                self._error_message(resp, f"Signing failed: HTTP {resp.status_code}")
+            )
 
         # Parse successful response
         try:
@@ -1523,18 +1551,16 @@ class SignerClient:
             raise AuthenticationError("Invalid or missing token")
 
         if resp.status_code == 400:
-            data = self._safe_json(resp)
-            error = data.get("error", resp.text)
+            error = self._error_message(resp, "")
             if "not found" in error.lower():
                 raise KeyNotFoundError(error)
             raise SignerError(f"Bad request: {error}")
 
         if resp.status_code == 403:
-            data = self._safe_json(resp)
-            raise SignerError(data.get("error", "Forbidden"))
+            raise SignerError(self._error_message(resp, "Forbidden"))
 
         if resp.status_code != 200:
-            raise SignerError(f"Plan failed: HTTP {resp.status_code}")
+            raise SignerError(self._error_message(resp, f"Plan failed: HTTP {resp.status_code}"))
 
         try:
             data = resp.json()

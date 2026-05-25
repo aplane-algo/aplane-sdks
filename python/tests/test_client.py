@@ -159,6 +159,13 @@ class TestListKeys:
             with pytest.raises(AuthenticationError):
                 client.list_keys()
 
+    def test_json_error_body(self):
+        client = make_client()
+        resp = mock_response(500, {"error": "inventory unavailable"})
+        with patch.object(client.session, "get", return_value=resp):
+            with pytest.raises(SignerError, match="inventory unavailable"):
+                client.list_keys(refresh=True)
+
     def test_cache(self):
         client = make_client()
         resp = mock_response(200, {

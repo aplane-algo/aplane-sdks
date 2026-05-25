@@ -90,6 +90,7 @@ export type {
   SignRequest,
   GroupSignRequest,
   GroupSignResponse,
+  ErrorResponse,
   MutationReport,
   PlanGroupResponse,
   CancelSignRequest,

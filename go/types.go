@@ -191,6 +191,11 @@ type GroupSignResponse struct {
 	Error     string          `json:"error,omitempty"`
 }
 
+// ErrorResponse is the standard signer HTTP error body for non-2xx responses.
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
 // PlanGroupResponse is the response from the /plan endpoint.
 // Returns the planned group (unsigned transactions with dummies, adjusted fees,
 // group IDs) and a mutation report. No keys are touched, no approval flow is

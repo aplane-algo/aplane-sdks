@@ -241,6 +241,17 @@ describe("SignerClient", () => {
       await assert.rejects(client.listKeys(), AuthenticationError);
     });
 
+    it("surfaces signer JSON error bodies", async () => {
+      mockFetch.mockResolvedValueOnce({
+        status: 500,
+        ok: false,
+        json: async () => ({ error: "inventory unavailable" }),
+      });
+
+      const client = new SignerClient("http://localhost:11270", "test-token");
+      await assert.rejects(client.listKeys(true), /inventory unavailable/);
+    });
+
     it("uses cache on subsequent calls", async () => {
       const mockKeys = {
         count: 1,
