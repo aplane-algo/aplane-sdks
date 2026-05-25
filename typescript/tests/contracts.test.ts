@@ -159,6 +159,10 @@ describe("signer API contract fixtures", () => {
     assert.equal(timelock.creationParams?.[2].min, 1);
     assert.equal(timelock.creationParams?.[2].max, 999999999);
     assert.equal(timelock.creationParams?.[3].maxLength, 32);
+    assert.equal(timelock.creationParams?.[3].inputModes?.[1].name, "sha256");
+    assert.equal(timelock.creationParams?.[3].inputModes?.[1].transform, "sha256");
+    assert.equal(timelock.creationParams?.[3].inputModes?.[1].byteLength, 32);
+    assert.equal(timelock.creationParams?.[3].inputModes?.[1].inputType, "bytes");
     assert.equal(timelock.runtimeArgs?.[0].label, "Preimage");
     assert.equal(timelock.runtimeArgs?.[0].required, true);
     assert.equal(timelock.runtimeArgs?.[0].byteLength, 32);

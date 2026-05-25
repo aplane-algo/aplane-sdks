@@ -124,6 +124,11 @@ def test_list_key_types_maps_creation_and_runtime_metadata():
     assert timelock.creation_params[2].min == 1
     assert timelock.creation_params[2].max == 999999999
     assert timelock.creation_params[3].max_length == 32
+    assert timelock.creation_params[3].input_modes is not None
+    assert timelock.creation_params[3].input_modes[1].name == "sha256"
+    assert timelock.creation_params[3].input_modes[1].transform == "sha256"
+    assert timelock.creation_params[3].input_modes[1].byte_length == 32
+    assert timelock.creation_params[3].input_modes[1].input_type == "bytes"
     assert timelock.runtime_args is not None
     assert timelock.runtime_args[0].label == "Preimage"
     assert timelock.runtime_args[0].required is True

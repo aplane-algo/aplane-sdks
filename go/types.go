@@ -244,21 +244,35 @@ type RuntimeArgInfo = RuntimeArg
 // It has the same shape as RuntimeArg but a different authority.
 type SigningArg = RuntimeArg
 
+// InputMode describes an alternate UI input mode for a creation parameter.
+type InputMode struct {
+	Name       string `json:"name"`
+	Label      string `json:"label,omitempty"`
+	Transform  string `json:"transform,omitempty"`
+	ByteLength int    `json:"byte_length,omitempty"`
+	InputType  string `json:"input_type,omitempty"`
+}
+
+// InputModeInfo is kept as a compatibility alias for callers using the server
+// DTO name.
+type InputModeInfo = InputMode
+
 // CreationParam describes a parameter for key generation.
 type CreationParam struct {
-	Name        string  `json:"name"`
-	Label       string  `json:"label"`
-	Description string  `json:"description,omitempty"`
-	Type        string  `json:"type"`
-	Required    bool    `json:"required"`
-	MaxLength   int     `json:"max_length,omitempty"`
-	MinItems    int     `json:"min_items,omitempty"`
-	MaxItems    int     `json:"max_items,omitempty"`
-	Min         *uint64 `json:"min,omitempty"`
-	Max         *uint64 `json:"max,omitempty"`
-	Example     string  `json:"example,omitempty"`
-	Placeholder string  `json:"placeholder,omitempty"`
-	Default     string  `json:"default,omitempty"`
+	Name        string      `json:"name"`
+	Label       string      `json:"label"`
+	Description string      `json:"description,omitempty"`
+	Type        string      `json:"type"`
+	Required    bool        `json:"required"`
+	MaxLength   int         `json:"max_length,omitempty"`
+	InputModes  []InputMode `json:"input_modes,omitempty"`
+	MinItems    int         `json:"min_items,omitempty"`
+	MaxItems    int         `json:"max_items,omitempty"`
+	Min         *uint64     `json:"min,omitempty"`
+	Max         *uint64     `json:"max,omitempty"`
+	Example     string      `json:"example,omitempty"`
+	Placeholder string      `json:"placeholder,omitempty"`
+	Default     string      `json:"default,omitempty"`
 }
 
 // KeyTypeInfo describes an available key type on the signer.

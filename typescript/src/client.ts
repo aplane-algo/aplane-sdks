@@ -708,6 +708,15 @@ export class SignerClient {
           paramType: p.type,
           required: p.required,
           maxLength: p.max_length,
+          inputModes: Array.isArray(p.input_modes)
+            ? p.input_modes.map((mode: any) => ({
+                name: mode.name,
+                label: mode.label,
+                transform: mode.transform,
+                byteLength: mode.byte_length,
+                inputType: mode.input_type,
+              }))
+            : undefined,
           minItems: p.min_items,
           maxItems: p.max_items,
           min: p.min,

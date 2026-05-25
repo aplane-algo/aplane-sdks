@@ -209,6 +209,16 @@ class ClientConfig:
 
 
 @dataclass
+class InputModeInfo:
+    """Alternate UI input mode for a creation parameter"""
+    name: str
+    label: str = ""
+    transform: str = ""
+    byte_length: int = 0
+    input_type: str = ""
+
+
+@dataclass
 class CreationParam:
     """Parameter specification for key generation"""
     name: str
@@ -217,6 +227,7 @@ class CreationParam:
     param_type: str = ""  # "address", "address[]", "uint64", "string", "bytes"
     required: bool = False
     max_length: int = 0
+    input_modes: Optional[List[InputModeInfo]] = None
     min_items: int = 0
     max_items: int = 0
     min: Optional[int] = None
@@ -992,6 +1003,16 @@ class SignerClient:
                         param_type=p.get("type", ""),
                         required=p.get("required", False),
                         max_length=p.get("max_length", 0),
+                        input_modes=[
+                            InputModeInfo(
+                                name=mode["name"],
+                                label=mode.get("label", ""),
+                                transform=mode.get("transform", ""),
+                                byte_length=mode.get("byte_length", 0),
+                                input_type=mode.get("input_type", ""),
+                            )
+                            for mode in p.get("input_modes", [])
+                        ] or None,
                         min_items=p.get("min_items", 0),
                         max_items=p.get("max_items", 0),
                         min=p.get("min"),

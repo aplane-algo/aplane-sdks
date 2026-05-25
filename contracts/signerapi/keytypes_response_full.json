@@ -59,6 +59,19 @@
           "type": "string",
           "required": false,
           "max_length": 32,
+          "input_modes": [
+            {
+              "name": "text",
+              "label": "Text"
+            },
+            {
+              "name": "sha256",
+              "label": "SHA-256",
+              "transform": "sha256",
+              "byte_length": 32,
+              "input_type": "bytes"
+            }
+          ],
           "default": "aplane"
         }
       ],

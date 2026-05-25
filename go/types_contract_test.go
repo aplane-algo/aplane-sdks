@@ -161,6 +161,22 @@ func TestGoSDKContractKeyTypeMetadata(t *testing.T) {
 	if resp.KeyTypes[1].MnemonicImport {
 		t.Fatal("generic template fixture should not allow mnemonic import")
 	}
+	modes := resp.KeyTypes[1].CreationParams[3].InputModes
+	if len(modes) != 2 {
+		t.Fatalf("InputModes length = %d, want 2", len(modes))
+	}
+	if modes[1].Name != "sha256" {
+		t.Fatalf("InputModes[1].Name = %q, want sha256", modes[1].Name)
+	}
+	if modes[1].Transform != "sha256" {
+		t.Fatalf("InputModes[1].Transform = %q, want sha256", modes[1].Transform)
+	}
+	if modes[1].ByteLength != 32 {
+		t.Fatalf("InputModes[1].ByteLength = %d, want 32", modes[1].ByteLength)
+	}
+	if modes[1].InputType != "bytes" {
+		t.Fatalf("InputModes[1].InputType = %q, want bytes", modes[1].InputType)
+	}
 }
 
 func TestGoSDKMapsTemplateWarningFields(t *testing.T) {

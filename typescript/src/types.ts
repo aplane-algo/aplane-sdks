@@ -116,6 +116,22 @@ export interface SignOptions {
 }
 
 /**
+ * Alternate UI input mode for a creation parameter.
+ */
+export interface InputModeInfo {
+  /** Mode name, such as "text" or "sha256" */
+  name: string;
+  /** Human-readable label */
+  label?: string;
+  /** Transform applied by this mode, such as "sha256" */
+  transform?: string;
+  /** Expected byte length after transform */
+  byteLength?: number;
+  /** Input type accepted by this mode */
+  inputType?: string;
+}
+
+/**
  * Parameter specification for key generation.
  */
 export interface CreationParam {
@@ -131,6 +147,8 @@ export interface CreationParam {
   required?: boolean;
   /** Maximum string/byte length */
   maxLength?: number;
+  /** Alternate UI input modes for this parameter */
+  inputModes?: InputModeInfo[];
   /** Minimum number of items for list parameters */
   minItems?: number;
   /** Maximum number of items for list parameters */

@@ -75,6 +75,7 @@ export type {
   KeyInfo,
   RuntimeArg,
   SigningArg,
+  InputModeInfo,
   CreationParam,
   KeyTypeInfo,
   StatusResponse,
