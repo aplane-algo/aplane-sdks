@@ -10,7 +10,7 @@ compatible APlane release tags and may skip product release numbers.
 ## Installation
 
 ```bash
-npm install aplane algosdk
+npm install aplanesdk algosdk
 ```
 
 For the AlgoKit adapter example/client helpers, install AlgoKit Utils 4 in the
@@ -23,8 +23,8 @@ npm install "@algorandfoundation/algokit-utils@^10.0.0-beta.2"
 Or with yarn/pnpm:
 
 ```bash
-yarn add aplane algosdk
-pnpm add aplane algosdk
+yarn add aplanesdk algosdk
+pnpm add aplanesdk algosdk
 ```
 
 ### Installing from Local Tarball
@@ -38,7 +38,7 @@ npm pack
 
 # In your consuming project
 npm init -y   # if needed
-npm install ../path/to/aplane-0.1.0.tgz algosdk
+npm install ../path/to/aplanesdk-0.1.0.tgz algosdk
 ```
 
 ### Troubleshooting
@@ -46,13 +46,13 @@ npm install ../path/to/aplane-0.1.0.tgz algosdk
 **Peer dependency conflicts**: If you see peer dependency errors, try:
 
 ```bash
-npm install aplane algosdk --legacy-peer-deps
+npm install aplanesdk algosdk --legacy-peer-deps
 ```
 
 ## Quick Start
 
 ```typescript
-import { SignerClient, sendRawTransaction } from "aplane";
+import { SignerClient, sendRawTransaction } from "aplanesdk";
 import algosdk from "algosdk";
 
 // Connect to signer
@@ -148,7 +148,7 @@ If you want Trust-On-First-Use host enrollment, set `trust_on_first_use: true`. 
 The token is the contents of the `aplane.token` file from your apsigner data directory.
 
 ```typescript
-import { loadToken } from "aplane";
+import { loadToken } from "aplanesdk";
 
 // Load from file
 const token = loadToken("~/aplane/apclient/aplane.token");
@@ -304,7 +304,7 @@ adapter, then submits the signed blobs with AlgoKit's algod client:
 
 ```typescript
 import { AlgorandClient, microAlgo } from "@algorandfoundation/algokit-utils";
-import { SignerClient, createApsignerAccount } from "aplane";
+import { SignerClient, createApsignerAccount } from "aplanesdk";
 
 const sender = "SENDER_ADDRESS";
 const algorand = AlgorandClient.testNet();
@@ -395,7 +395,7 @@ See the repository [README](https://github.com/aplane-algo/aplane-sdks/blob/main
   SigningRejectedError,
   SignerUnavailableError,
   KeyNotFoundError,
-} from "aplane";
+} from "aplanesdk";
 
 try {
   const signed = await client.signTransaction(txn);
@@ -425,7 +425,7 @@ import {
   LogicSigRejectedError,
   InsufficientFundsError,
   InvalidTransactionError,
-} from "aplane";
+} from "aplanesdk";
 
 try {
   const txid = await sendRawTransaction(algodClient, signed);
@@ -445,7 +445,7 @@ try {
 ## Example: Complete Workflow
 
 ```typescript
-import { SignerClient, loadToken, SignerError, sendRawTransaction } from "aplane";
+import { SignerClient, loadToken, SignerError, sendRawTransaction } from "aplanesdk";
 import algosdk from "algosdk";
 
 async function main() {

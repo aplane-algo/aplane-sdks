@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-from aplane.signer import (
+from aplanesdk.signer import (
     SignerClient,
     AuthenticationError,
     SigningRejectedError,
@@ -390,7 +390,7 @@ class TestPlanGroup:
             },
         })
         with patch.object(client.session, "post", return_value=resp), \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             result = client.plan_group([self._make_mock_txn()])
 
         assert "transactions" in result
@@ -400,7 +400,7 @@ class TestPlanGroup:
     def test_auth_error(self):
         client = make_client()
         with patch.object(client.session, "post", return_value=mock_response(401)), \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             with pytest.raises(AuthenticationError):
                 client.plan_group([self._make_mock_txn()])
 
@@ -408,7 +408,7 @@ class TestPlanGroup:
         client = make_client()
         resp = mock_response(200, {"error": "Internal error"})
         with patch.object(client.session, "post", return_value=resp), \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             with pytest.raises(SignerError):
                 client.plan_group([self._make_mock_txn()])
 
@@ -441,7 +441,7 @@ class TestSigningErrors:
     def test_auth_error(self):
         client = make_client()
         with patch.object(client.session, "post", return_value=mock_response(401)), \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             with pytest.raises(AuthenticationError):
                 client.sign_transaction(self._make_mock_txn())
 
@@ -449,7 +449,7 @@ class TestSigningErrors:
         client = make_client()
         resp = mock_response(403, {"error": "Operator rejected"})
         with patch.object(client.session, "post", return_value=resp), \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             with pytest.raises(SigningRejectedError):
                 client.sign_transaction(self._make_mock_txn())
 
@@ -457,7 +457,7 @@ class TestSigningErrors:
         client = make_client()
         resp = mock_response(503, {"error": "Signer locked"})
         with patch.object(client.session, "post", return_value=resp), \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             with pytest.raises(SignerUnavailableError):
                 client.sign_transaction(self._make_mock_txn())
 
@@ -465,7 +465,7 @@ class TestSigningErrors:
         client = make_client()
         resp = mock_response(400, {"error": "Key not found: INVALID_ADDRESS"})
         with patch.object(client.session, "post", return_value=resp), \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             with pytest.raises(KeyNotFoundError):
                 client.sign_transaction(self._make_mock_txn())
 
@@ -486,7 +486,7 @@ class TestSigningErrors:
         resp = mock_response(200, {"signed": ["deadbeef"]})
         with patch.object(client, "get_status", side_effect=SignerUnavailableError("down")), \
              patch.object(client.session, "post", return_value=resp), \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             signed = client.sign_transaction(self._make_mock_txn())
 
         assert base64.b64decode(signed) == bytes.fromhex("deadbeef")
@@ -495,7 +495,7 @@ class TestSigningErrors:
         import requests
         client = make_client()
         with patch.object(client.session, "post", side_effect=requests.ConnectionError("timed out")), \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             with pytest.raises(SignerUnavailableError):
                 client.sign_transaction(self._make_mock_txn())
 
@@ -507,8 +507,8 @@ class TestSigningErrors:
             requests.Timeout("timed out"),
             cancel_resp,
         ]) as mock_post, \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")), \
-             patch("aplane.signer._new_sign_request_id", return_value="sdk-test"):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")), \
+             patch("aplanesdk.signer._new_sign_request_id", return_value="sdk-test"):
             with pytest.raises(SignerUnavailableError):
                 client.sign_transaction(self._make_mock_txn())
 
@@ -521,7 +521,7 @@ class TestSigningErrors:
         client = make_client()
         resp = mock_response(200, {"signed": ["deadbeef"]})
         with patch.object(client.session, "post", return_value=resp) as mock_post, \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             client.sign_transaction(self._make_mock_txn(), request_id="app-owned-id")
 
         assert mock_post.call_args.kwargs["json"]["request_id"] == "app-owned-id"
@@ -603,7 +603,7 @@ class TestSignTransactionsForeign:
     def test_rejects_foreign_in_sign_transactions(self):
         client = make_client()
         with patch.object(client.session, "post") as mock_post, \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             with pytest.raises(SignerError, match="foreign entries are only supported on /plan"):
                 client.sign_transactions(
                     [self._make_mock_txn(), self._make_mock_txn()],
@@ -614,7 +614,7 @@ class TestSignTransactionsForeign:
     def test_sign_transactions_list_rejects_foreign(self):
         client = make_client()
         with patch.object(client.session, "post") as mock_post, \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             with pytest.raises(SignerError, match="foreign entries are only supported on /plan"):
                 client.sign_transactions_list(
                 [self._make_mock_txn(), self._make_mock_txn()],
@@ -637,7 +637,7 @@ class TestBuildSignRequests:
         client = make_client()
         resp = mock_response(200, {"signed": ["deadbeef"]})
         with patch.object(client.session, "post", return_value=resp) as mock_post, \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             client.sign_transaction(self._make_mock_txn(), auth_address="AUTH_ADDR")
 
         call_kwargs = mock_post.call_args
@@ -651,7 +651,7 @@ class TestBuildSignRequests:
         client = make_client()
         resp = mock_response(200, {"signed": ["deadbeef"]})
         with patch.object(client.session, "post", return_value=resp) as mock_post, \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "MY_SENDER")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "MY_SENDER")):
             client.sign_transaction(self._make_mock_txn(sender="MY_SENDER"))
 
         call_kwargs = mock_post.call_args
@@ -662,7 +662,7 @@ class TestBuildSignRequests:
         client = make_client()
         resp = mock_response(200, {"signed": ["deadbeef"]})
         with patch.object(client.session, "post", return_value=resp) as mock_post, \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "LSIG_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "LSIG_ADDR")):
             client.sign_transaction(
                 self._make_mock_txn(sender="LSIG_ADDR"),
                 auth_address="LSIG_ADDR",
@@ -715,7 +715,7 @@ class TestSignReturnFormat:
         hex2 = b"signed-txn-2".hex()
         resp = mock_response(200, {"signed": [hex1, hex2]})
         with patch.object(client.session, "post", return_value=resp), \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             result = client.sign_transactions_list(
                 [self._make_mock_txn(), self._make_mock_txn()]
             )
@@ -730,7 +730,7 @@ class TestSignReturnFormat:
         hex2 = b"signed-txn-2".hex()
         resp = mock_response(200, {"signed": [hex1, hex2]})
         with patch.object(client.session, "post", return_value=resp), \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             result = client.sign_transactions(
                 [self._make_mock_txn(), self._make_mock_txn()]
             )
@@ -742,7 +742,7 @@ class TestSignReturnFormat:
         client = make_client()
         resp = mock_response(200, {"signed": [b"signed-txn-1".hex(), ""]})
         with patch.object(client.session, "post", return_value=resp), \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             with pytest.raises(SignerError, match="empty signed transaction slot"):
                 client.sign_transactions(
                     [self._make_mock_txn(), self._make_mock_txn()]
@@ -752,7 +752,7 @@ class TestSignReturnFormat:
         client = make_client()
         resp = mock_response(200, {"signed": [b"signed-txn-1".hex(), ""]})
         with patch.object(client.session, "post", return_value=resp), \
-             patch("aplane.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
+             patch("aplanesdk.signer.encode_transaction", return_value=("deadbeef", "SENDER_ADDR")):
             with pytest.raises(SignerError, match="empty signed transaction slot"):
                 client.sign_transactions_list(
                     [self._make_mock_txn(), self._make_mock_txn()]
@@ -766,7 +766,7 @@ class TestRequestTokenToFile:
         ssh_dir.mkdir()
         (ssh_dir / "id_ed25519").write_text("dummy-private-key")
 
-        with patch("aplane.signer.request_token", return_value="test-token"):
+        with patch("aplanesdk.signer.request_token", return_value="test-token"):
             path = request_token_to_file(
                 data_dir=str(tmp_path),
                 host="example.com",
@@ -823,13 +823,13 @@ class TestAssembleGroup:
 class TestEncoding:
     def test_encode_transaction(self):
         """encode_transaction returns (hex, sender)."""
-        from aplane.signer import encode_transaction
+        from aplanesdk.signer import encode_transaction
         txn = MagicMock()
         txn.sender = "SENDER_ADDR"
         txn.dictify.return_value = {"snd": b"\x00" * 32}
         txn.get_txid.return_value = "TXID"
 
-        with patch("aplane.signer.encoding.msgpack_encode", return_value="gqNzbmTEIAAA"):
+        with patch("aplanesdk.signer.encoding.msgpack_encode", return_value="gqNzbmTEIAAA"):
             result = encode_transaction(txn)
 
         assert isinstance(result, tuple)

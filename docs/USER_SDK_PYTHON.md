@@ -3,7 +3,7 @@
 Use the APlane Python SDK to sign Algorand transactions through `apsigner`
 from Python applications and scripts.
 
-The published package is `aplane`. It uses the same client data directory and
+The published package is `aplanesdk`. It uses the same client data directory and
 SSH-backed connection model as `apshell`, so it fits naturally into an
 existing APlane client install.
 
@@ -32,12 +32,12 @@ Python, Go, and TypeScript SDK package versions will always match.
     `known_hosts`, or
   - explicit signer host, token, SSH key, and `known_hosts` paths
 
-When you install `aplane`, its runtime dependencies are installed with it,
+When you install `aplanesdk`, its runtime dependencies are installed with it,
 including `py-algorand-sdk`, `paramiko`, `requests`, and `pyyaml`.
 
 ## Installation
 
-The published package name is `aplane` on PyPI.
+The published package name is `aplanesdk` on PyPI.
 
 ### Recommended: Install In A Virtual Environment
 
@@ -52,13 +52,13 @@ python -m pip install --upgrade pip
 Install the SDK from PyPI:
 
 ```bash
-python -m pip install aplane
+python -m pip install aplanesdk
 ```
 
 Install a specific published version:
 
 ```bash
-python -m pip install 'aplane==<version>'
+python -m pip install 'aplanesdk==<version>'
 ```
 
 Install AlgoKit Utils in the same environment when using the optional AlgoKit
@@ -71,7 +71,7 @@ python -m pip install 'algokit-utils>=5.0.0b1'
 Verify that the package imports and reports the installed version:
 
 ```bash
-python -c 'import aplane; print(aplane.__version__)'
+python -c 'import aplanesdk; print(aplanesdk.__version__)'
 ```
 
 ### Install From A Repo Checkout
@@ -90,7 +90,7 @@ python -m pip install -e './python[dev]'
 
 ### What Gets Installed
 
-Installing `aplane` also installs its runtime dependencies, including:
+Installing `aplanesdk` also installs its runtime dependencies, including:
 
 - `py-algorand-sdk`
 - `paramiko`
@@ -158,7 +158,7 @@ path is:
 Provision and save a token with the Python helper:
 
 ```python
-from aplane import request_token_to_file
+from aplanesdk import request_token_to_file
 
 token_path = request_token_to_file()
 print(f"Saved token to {token_path}")
@@ -183,7 +183,7 @@ the `request-token` command; `apshell` writes the approved token to
 ### Recommended: Load From Client Data Dir
 
 ```python
-from aplane import SignerClient
+from aplanesdk import SignerClient
 
 client = SignerClient.from_env()
 try:
@@ -210,7 +210,7 @@ This path:
 ### Explicit SSH Connection
 
 ```python
-from aplane import SignerClient
+from aplanesdk import SignerClient
 
 with SignerClient.connect_ssh(
     host="signer.example.com",
@@ -360,7 +360,7 @@ This is also an authenticated admin operation and requires an unlocked signer.
 ### Sign One Transaction
 
 ```python
-from aplane import SignerClient, send_raw_transaction
+from aplanesdk import SignerClient, send_raw_transaction
 from algosdk import transaction
 from algosdk.v2client import algod
 
@@ -435,7 +435,7 @@ for AlgoKit transaction signing.
 
 The minimal repository example is `python/examples/algokit_self_send.py`. From
 a checkout, run it as a module so Python imports the local SDK source instead
-of any installed `aplane` package:
+of any installed `aplanesdk` package:
 
 ```bash
 cd ~/aplane-sdks/python
@@ -452,8 +452,8 @@ The core flow is:
 
 ```python
 from algokit_utils import AlgoAmount, AlgorandClient, PaymentParams
-from aplane import SignerClient
-from aplane.algokit import create_apsigner_account
+from aplanesdk import SignerClient
+from aplanesdk.algokit import create_apsigner_account
 
 sender = "SENDER_ADDRESS"
 algorand = AlgorandClient.testnet()
@@ -547,7 +547,7 @@ partial list-per-slot outputs where unsigned slots are represented by empty
 strings:
 
 ```python
-from aplane import assemble_group
+from aplanesdk import assemble_group
 
 combined = assemble_group([alice_signed_list, bob_signed_list])
 ```
@@ -572,7 +572,7 @@ The SDK raises typed exceptions for the common signer-side failure cases:
 Typical pattern:
 
 ```python
-from aplane import (
+from aplanesdk import (
     AuthenticationError,
     SignerUnavailableError,
     SigningRejectedError,

@@ -22,7 +22,7 @@ Example config.yaml (SSH tunnel):
 
 from algosdk import transaction
 from algosdk.v2client import algod
-from aplane import SignerClient, send_raw_transaction
+from aplanesdk import SignerClient, send_raw_transaction
 
 # The address to validate (must exist in apsigner keystore)
 # Replace with your actual address

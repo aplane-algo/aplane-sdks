@@ -61,7 +61,7 @@ jobs:
           from pathlib import Path
 
           version = os.environ["VERSION"]
-          path = Path("python/aplane/_version.py")
+          path = Path("python/aplanesdk/_version.py")
           text = path.read_text(encoding="utf-8")
           updated, count = re.subn(
               r'(?m)^__version__ = "[^"]+"$',
@@ -70,7 +70,7 @@ jobs:
               count=1,
           )
           if count != 1:
-              raise SystemExit("failed to update python/aplane/_version.py version")
+              raise SystemExit("failed to update python/aplanesdk/_version.py version")
           path.write_text(updated, encoding="utf-8")
           print(f"Set Python SDK version to {version}")
           PY
@@ -130,9 +130,9 @@ jobs:
           This is the aplane-sdks repository release. The package-manager
           artifacts keep their canonical package filenames:
 
-          - \`aplane-$VERSION-py3-none-any.whl\` - Python SDK wheel for the PyPI package \`aplane\`
-          - \`aplane-$VERSION.tar.gz\` - Python SDK source distribution for the PyPI package \`aplane\`
-          - \`aplane-$VERSION.tgz\` - TypeScript SDK npm package tarball for the npm package \`aplane\`
+          - \`aplanesdk-$VERSION-py3-none-any.whl\` - Python SDK wheel for the PyPI package \`aplanesdk\`
+          - \`aplanesdk-$VERSION.tar.gz\` - Python SDK source distribution for the PyPI package \`aplanesdk\`
+          - \`aplanesdk-$VERSION.tgz\` - TypeScript SDK npm package tarball for the npm package \`aplanesdk\`
           - \`aplane-go-sdk-$VERSION.tar.gz\` - Go SDK source archive
           EOF
 
@@ -178,7 +178,7 @@ jobs:
           from pathlib import Path
 
           version = os.environ["VERSION"]
-          path = Path("python/aplane/_version.py")
+          path = Path("python/aplanesdk/_version.py")
           text = path.read_text(encoding="utf-8")
           updated, count = re.subn(
               r'(?m)^__version__ = "[^"]+"$',
@@ -187,7 +187,7 @@ jobs:
               count=1,
           )
           if count != 1:
-              raise SystemExit("failed to update python/aplane/_version.py version")
+              raise SystemExit("failed to update python/aplanesdk/_version.py version")
           path.write_text(updated, encoding="utf-8")
           print(f"Set Python SDK version to {version}")
           PY
@@ -246,8 +246,8 @@ jobs:
           SDK_TAG: ${{ inputs.tag }}
         run: |
           VERSION="${SDK_TAG#v}"
-          if npm view "aplane@$VERSION" version >/dev/null 2>&1; then
-            echo "aplane@$VERSION already published; skipping"
+          if npm view "aplanesdk@$VERSION" version >/dev/null 2>&1; then
+            echo "aplanesdk@$VERSION already published; skipping"
             exit 0
           fi
           npm publish --provenance --access public

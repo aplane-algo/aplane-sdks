@@ -17,7 +17,7 @@
  *       identity_file: .ssh/id_ed25519
  *
  * Usage:
- *     import { SignerClient, sendRawTransaction } from "aplane";
+ *     import { SignerClient, sendRawTransaction } from "aplanesdk";
  *
  *     const client = await SignerClient.fromEnv();
  *     const signed = await client.signTransaction(txn);

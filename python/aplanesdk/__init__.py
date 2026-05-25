@@ -7,11 +7,11 @@ APlane Python SDK - Transaction signing via apsigner
 Data directory: required via data_dir parameter or APCLIENT_DATA env var
 
 Token provisioning:
-    from aplane import request_token_to_file
+    from aplanesdk import request_token_to_file
     request_token_to_file()  # operator must approve in apadmin
 
 Usage:
-    from aplane import SignerClient, send_raw_transaction
+    from aplanesdk import SignerClient, send_raw_transaction
 
     client = SignerClient.from_env()
     signed_txn = client.sign_transaction(txn)

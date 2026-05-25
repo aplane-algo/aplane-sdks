@@ -4,8 +4,8 @@
 import os
 
 from algokit_utils import AlgoAmount, AlgorandClient, PaymentParams
-from aplane import SignerClient
-from aplane.algokit import create_apsigner_account
+from aplanesdk import SignerClient
+from aplanesdk.algokit import create_apsigner_account
 
 
 sender = os.environ["APLANE_ADDRESS"]

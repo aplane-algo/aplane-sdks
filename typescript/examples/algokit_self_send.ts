@@ -1,5 +1,5 @@
 import { AlgorandClient, microAlgo } from "@algorandfoundation/algokit-utils";
-import { SignerClient, createApsignerAccount } from "aplane";
+import { SignerClient, createApsignerAccount } from "aplanesdk";
 
 // Minimal AlgoKit Utils example using an apsigner-backed account.
 const sender = process.env.APLANE_ADDRESS;

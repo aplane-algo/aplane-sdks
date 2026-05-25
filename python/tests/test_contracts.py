@@ -8,7 +8,7 @@ import base64
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from aplane.signer import CancelSignResponse, SignerClient, StatusResponse
+from aplanesdk.signer import CancelSignResponse, SignerClient, StatusResponse
 
 
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "contracts" / "signerapi"
@@ -66,7 +66,7 @@ def test_encodes_mixed_group_sign_request_wire_fields():
     foreign_txn.sender = "FOREIGNADDR000000000000000000000000000000000000000000"
     passthrough = base64.b64encode(bytes.fromhex("82a3736967c440")).decode()
 
-    with patch("aplane.signer.encoding.msgpack_encode", side_effect=["AQ==", "Ag=="]):
+    with patch("aplanesdk.signer.encoding.msgpack_encode", side_effect=["AQ==", "Ag=="]):
         body = client._build_sign_request_body(
             [sign_txn, None, foreign_txn],
             ["AUTHADDR00000000000000000000000000000000000000000000000", None, None],
@@ -186,7 +186,7 @@ def test_plan_group_returns_wire_mutation_report():
     txn = MagicMock()
     txn.sender = "SENDERADDR0000000000000000000000000000000000000000000"
 
-    with patch("aplane.signer.encoding.msgpack_encode", return_value="AQ=="):
+    with patch("aplanesdk.signer.encoding.msgpack_encode", return_value="AQ=="):
         with patch.object(client.session, "post", return_value=resp):
             plan = client.plan_group(
                 [txn],
