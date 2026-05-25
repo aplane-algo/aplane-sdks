@@ -1,0 +1,44 @@
+{
+  "name": "aplane",
+  "version": "0.20.2",
+  "description": "Historical handoff package for the APlane TypeScript SDK",
+  "license": "MIT",
+  "author": "APlane Project LLC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aplane-algo/aplane-sdks.git",
+    "directory": "typescript"
+  },
+  "homepage": "https://github.com/aplane-algo/aplanesdk#readme",
+  "bugs": {
+    "url": "https://github.com/aplane-algo/aplanesdk/issues"
+  },
+  "keywords": [
+    "algorand",
+    "blockchain",
+    "signing",
+    "sdk"
+  ],
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "files": [
+    "README.md",
+    "index.js",
+    "index.d.ts"
+  ],
+  "scripts": {
+    "build": "node -e \"console.log('aplane moved to aplanesdk')\"",
+    "test": "npm run build"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=10.0.0"
+  }
+}
