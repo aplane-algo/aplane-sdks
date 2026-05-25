@@ -12,9 +12,9 @@ import pytest
 import yaml
 from algosdk import encoding, transaction
 
-from aplanesdk.algokit import ApsignerAccount
-from aplanesdk.signer import encode_transaction
-from aplanesdk.signer import SignerClient
+from aplane.algokit import ApsignerAccount
+from aplane.signer import encode_transaction
+from aplane.signer import SignerClient
 
 
 def _integration_enabled() -> bool:

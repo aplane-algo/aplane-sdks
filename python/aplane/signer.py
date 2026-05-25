@@ -19,13 +19,13 @@ Example config.yaml:
       identity_file: .ssh/id_ed25519
 
 Token Provisioning:
-    from aplanesdk import request_token_to_file
+    from aplane import request_token_to_file
 
     # Request token (operator must approve in apadmin)
     request_token_to_file()  # reads APCLIENT_DATA from environment
 
 Usage:
-    from aplanesdk import SignerClient
+    from aplane import SignerClient
 
     client = SignerClient.from_env()  # reads APCLIENT_DATA from environment
     signed_txn = client.sign_transaction(txn)

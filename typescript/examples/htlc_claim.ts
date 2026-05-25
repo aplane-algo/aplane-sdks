@@ -25,7 +25,7 @@
  */
 
 import algosdk from "algosdk";
-import { SignerClient, sendRawTransaction } from "aplanesdk";
+import { SignerClient, sendRawTransaction } from "aplane";
 
 // The hashlock address (must exist in apsigner keystore)
 const HASHLOCK_ADDRESS = "HASHLOCKEXAMPLE7777777777777777777777777777777777777777";

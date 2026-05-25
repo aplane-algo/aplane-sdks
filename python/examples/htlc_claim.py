@@ -27,7 +27,7 @@ Prerequisites:
 
 from algosdk import transaction
 from algosdk.v2client import algod
-from aplanesdk import SignerClient, send_raw_transaction
+from aplane import SignerClient, send_raw_transaction
 
 # The hashlock address (must exist in apsigner keystore)
 HASHLOCK_ADDRESS = "HASHLOCKEXAMPLE7777777777777777777777777777777777777777"

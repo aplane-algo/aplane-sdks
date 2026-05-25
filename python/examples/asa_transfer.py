@@ -22,7 +22,7 @@ Example config.yaml (SSH tunnel):
 
 from algosdk import transaction
 from algosdk.v2client import algod
-from aplanesdk import SignerClient, send_raw_transaction
+from aplane import SignerClient, send_raw_transaction
 
 # Transaction parameters (replace with your actual addresses)
 SENDER = "ED255ACCOUNTEXAMPLE77777777777777777777777777777777777777777"

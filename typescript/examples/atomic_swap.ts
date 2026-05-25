@@ -25,7 +25,7 @@
  */
 
 import algosdk from "algosdk";
-import { SignerClient, sendRawTransaction } from "aplanesdk";
+import { SignerClient, sendRawTransaction } from "aplane";
 
 // Swap parameters (replace with your actual addresses)
 const ALICE = "ALICEED255EXAMPLE777777777777777777777777777777777777777777"; // Ed25519 account

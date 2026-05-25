@@ -20,7 +20,7 @@
  * */
 
 import algosdk from "algosdk";
-import { SignerClient, sendRawTransaction } from "aplanesdk";
+import { SignerClient, sendRawTransaction } from "aplane";
 
 // The address to validate (must exist in apsigner keystore)
 // Replace with your actual address

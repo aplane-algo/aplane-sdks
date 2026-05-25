@@ -20,7 +20,7 @@
  * */
 
 import algosdk from "algosdk";
-import { SignerClient, sendRawTransaction } from "aplanesdk";
+import { SignerClient, sendRawTransaction } from "aplane";
 
 // Transaction parameters (replace with your actual addresses)
 const SENDER = "ED255ACCOUNTEXAMPLE77777777777777777777777777777777777777777";

@@ -5,8 +5,8 @@ from threading import Event, Thread
 
 import pytest
 
-from aplanesdk.algokit import ApsignerAccount, create_apsigner_account, list_apsigner_accounts
-from aplanesdk.signer import GroupSignResponse, KeyInfo, SignerError
+from aplane.algokit import ApsignerAccount, create_apsigner_account, list_apsigner_accounts
+from aplane.signer import GroupSignResponse, KeyInfo, SignerError
 
 
 class MockTxn:

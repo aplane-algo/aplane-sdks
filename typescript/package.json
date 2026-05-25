@@ -1,5 +1,5 @@
 {
-  "name": "aplanesdk",
+  "name": "aplane",
   "version": "0.1.0",
   "description": "TypeScript SDK for signing Algorand transactions via apsigner",
   "license": "MIT",

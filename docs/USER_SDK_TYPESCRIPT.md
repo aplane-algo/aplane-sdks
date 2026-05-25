@@ -3,7 +3,7 @@
 Use the APlane TypeScript SDK to sign Algorand transactions through
 `apsigner` from Node.js applications and scripts.
 
-The published package is `aplanesdk`. It uses the same client data directory and
+The published package is `aplane`. It uses the same client data directory and
 SSH-backed connection model as `apshell`.
 
 ## Overview
@@ -36,24 +36,24 @@ The SDK expects:
 - `algosdk` as a peer dependency
 - `ssh2` for the SSH-backed runtime path
 
-In a normal package-manager install, `ssh2` is brought in via `aplanesdk`'s
+In a normal package-manager install, `ssh2` is brought in via `aplane`'s
 optional dependency. If your environment omits optional dependencies, install
 `ssh2` explicitly.
 
 ## Installation
 
-The published package name is `aplanesdk` on npm.
+The published package name is `aplane` on npm.
 
 ### Install From npm
 
 ```bash
-npm install aplanesdk algosdk
+npm install aplane algosdk
 ```
 
 Install a specific published version:
 
 ```bash
-npm install aplanesdk@<version> algosdk
+npm install aplane@<version> algosdk
 ```
 
 Install AlgoKit Utils 4 in the same project when using the optional AlgoKit
@@ -67,14 +67,14 @@ If your install omits optional dependencies or the runtime cannot resolve
 `ssh2`, add it explicitly:
 
 ```bash
-npm install aplanesdk algosdk ssh2
+npm install aplane algosdk ssh2
 ```
 
 With pnpm or yarn:
 
 ```bash
-pnpm add aplanesdk algosdk
-yarn add aplanesdk algosdk
+pnpm add aplane algosdk
+yarn add aplane algosdk
 ```
 
 ### Install From A Repo Checkout
@@ -94,7 +94,7 @@ cd typescript
 npm pack
 
 # In your consuming project
-npm install ../path/to/aplanesdk-<version>.tgz algosdk
+npm install ../path/to/aplane-<version>.tgz algosdk
 ```
 
 ### Verify The Install
@@ -102,7 +102,7 @@ npm install ../path/to/aplanesdk-<version>.tgz algosdk
 Basic import check:
 
 ```bash
-node --input-type=module -e 'import("aplanesdk").then(m => console.log(typeof m.SignerClient))'
+node --input-type=module -e 'import("aplane").then(m => console.log(typeof m.SignerClient))'
 ```
 
 ## Configuration And Credentials
@@ -163,7 +163,7 @@ path is:
 Provision and save a token with the TypeScript helper:
 
 ```ts
-import { requestTokenToFile } from "aplanesdk";
+import { requestTokenToFile } from "aplane";
 
 const tokenPath = await requestTokenToFile();
 console.log(`Saved token to ${tokenPath}`);
@@ -188,7 +188,7 @@ the `request-token` command; `apshell` writes the approved token to
 ### Recommended: Load From Client Data Dir
 
 ```ts
-import { SignerClient } from "aplanesdk";
+import { SignerClient } from "aplane";
 
 const client = await SignerClient.fromEnv();
 try {
@@ -216,7 +216,7 @@ This path:
 ### Explicit SSH Connection
 
 ```ts
-import { SignerClient, expandPath } from "aplanesdk";
+import { SignerClient, expandPath } from "aplane";
 
 const client = await SignerClient.connectSsh(
   "signer.example.com",
@@ -349,7 +349,7 @@ await client.deleteKey(generated.address);
 
 ```ts
 import algosdk from "algosdk";
-import { SignerClient, sendRawTransaction } from "aplanesdk";
+import { SignerClient, sendRawTransaction } from "aplane";
 
 const algodClient = new algosdk.Algodv2("", "https://testnet-api.4160.nodely.dev", "");
 const suggestedParams = await algodClient.getTransactionParams().do();
@@ -423,7 +423,7 @@ partial list-per-slot outputs where unsigned slots are represented by empty
 strings:
 
 ```ts
-import { assembleGroup } from "aplanesdk";
+import { assembleGroup } from "aplane";
 
 const aliceSigned = await aliceClient.signTransactionsList(...);
 const bobSigned = await bobClient.signTransactionsList(...);
@@ -459,7 +459,7 @@ The core flow is:
 
 ```ts
 import { AlgorandClient, microAlgo } from "@algorandfoundation/algokit-utils";
-import { SignerClient, createApsignerAccount } from "aplanesdk";
+import { SignerClient, createApsignerAccount } from "aplane";
 
 const sender = "SENDER_ADDRESS";
 const algorand = AlgorandClient.testNet();
@@ -542,7 +542,7 @@ import {
   AuthenticationError,
   SignerUnavailableError,
   SigningRejectedError,
-} from "aplanesdk";
+} from "aplane";
 
 try {
   const signed = await client.signTransaction(txn);

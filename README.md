@@ -11,8 +11,8 @@ the AGPL-licensed `aplane-algo/aplane` repository.
 | SDK | Directory | Package |
 | --- | --- | --- |
 | Go | `go/` | `github.com/aplane-algo/aplane-sdks/go` |
-| Python | `python/` | `aplanesdk` |
-| TypeScript | `typescript/` | `aplanesdk` |
+| Python | `python/` | `aplane` |
+| TypeScript | `typescript/` | `aplane` |
 
 Shared signer API contract fixtures live under `contracts/signerapi/` and are
 used by all SDK test suites.

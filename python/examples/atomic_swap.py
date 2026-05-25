@@ -27,7 +27,7 @@ Important:
 
 from algosdk import transaction
 from algosdk.v2client import algod
-from aplanesdk import SignerClient, send_raw_transaction
+from aplane import SignerClient, send_raw_transaction
 
 # Swap parameters (replace with your actual addresses)
 ALICE = "ALICEED255EXAMPLE777777777777777777777777777777777777777777"  # Ed25519 account

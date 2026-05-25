@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aplanesdk"
+name = "aplane"
 dynamic = ["version"]
 description = "Python SDK for APlane transaction signing"
 readme = "README.md"
@@ -44,10 +44,10 @@ Repository = "https://github.com/aplane-algo/aplane-sdks"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["aplanesdk*"]
+include = ["aplane*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "aplanesdk._version.__version__"}
+version = {attr = "aplane._version.__version__"}
 
 [tool.black]
 line-length = 100

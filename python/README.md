@@ -10,10 +10,10 @@ compatible APlane release tags and may skip product release numbers.
 ## Installation
 
 ```bash
-pip install aplanesdk
+pip install aplane
 ```
 
-The published package is `aplanesdk` on PyPI.
+The published package is `aplane` on PyPI.
 
 For the AlgoKit adapter, install AlgoKit Utils in the same environment:
 
@@ -31,7 +31,7 @@ pip install -e .
 ## Quick Start
 
 ```python
-from aplanesdk import SignerClient, send_raw_transaction
+from aplane import SignerClient, send_raw_transaction
 from algosdk import transaction
 from algosdk.v2client import algod
 
@@ -135,7 +135,7 @@ The recommended way to obtain a token is via the `request-token` flow, which enr
 If your token was provisioned separately (e.g. copied by the operator), you can load it explicitly:
 
 ```python
-from aplanesdk import load_token
+from aplane import load_token
 
 token = load_token("/path/to/apclient/aplane.token")
 ```
@@ -280,8 +280,8 @@ adapter, then submits the signed blobs with AlgoKit's algod client:
 
 ```python
 from algokit_utils import AlgoAmount, AlgorandClient, PaymentParams
-from aplanesdk import SignerClient
-from aplanesdk.algokit import create_apsigner_account
+from aplane import SignerClient
+from aplane.algokit import create_apsigner_account
 
 sender = "SENDER_ADDRESS"
 algorand = AlgorandClient.testnet()
@@ -369,7 +369,7 @@ The server assembles the complete signed transaction - the SDK returns a base64 
 ### Signing Exceptions
 
 ```python
-from aplanesdk import (
+from aplane import (
     SignerError,
     AuthenticationError,
     SigningRejectedError,
@@ -396,7 +396,7 @@ except SignerError as e:
 `send_raw_transaction()` wraps verbose algod errors into clean exceptions:
 
 ```python
-from aplanesdk import (
+from aplane import (
     send_raw_transaction,
     TransactionRejectedError,
     LogicSigRejectedError,
@@ -420,7 +420,7 @@ except TransactionRejectedError as e:
 
 ```python
 #!/usr/bin/env python3
-from aplanesdk import SignerClient, load_token, SignerError, send_raw_transaction
+from aplane import SignerClient, load_token, SignerError, send_raw_transaction
 from algosdk import transaction
 from algosdk.v2client import algod
 
