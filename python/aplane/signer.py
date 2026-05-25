@@ -187,8 +187,10 @@ class KeyInfo:
     lsig_size: int = 0
     is_generic_lsig: bool = False
     signing_args: Optional[List[SigningArg]] = None  # Key-file args required for LogicSigs
-    template_status: str = ""
-    template_warning: str = ""
+    template_provenance_status: str = ""
+    template_provenance_note: str = ""
+    template_status: str = ""  # Legacy alias for template_provenance_status
+    template_warning: str = ""  # Legacy alias for template_provenance_note
 
 
 @dataclass
@@ -349,7 +351,7 @@ def encode_transaction(txn: transaction.Transaction) -> tuple:
     Returns:
         (txn_bytes_hex, txn_sender) where:
         - txn_bytes_hex = hex(b"TX" + msgpack(txn))
-        - txn_sender = sender address string
+        - txn_sender = advisory display hint; signer authority comes from txn bytes
     """
     # Encode transaction to msgpack (algosdk returns base64 string)
     msgpack_b64 = encoding.msgpack_encode(txn)
@@ -960,9 +962,17 @@ class SignerClient:
                 lsig_size=k.get("lsig_size", 0),
                 is_generic_lsig=k.get("is_generic_lsig", False),
                 signing_args=signing_args,
-                template_status=k.get("template_status", ""),
-                template_warning=k.get("template_warning", ""),
+                template_provenance_status=(
+                    k.get("template_provenance_status")
+                    or k.get("template_status", "")
+                ),
+                template_provenance_note=(
+                    k.get("template_provenance_note")
+                    or k.get("template_warning", "")
+                ),
             )
+            key_info.template_status = key_info.template_provenance_status
+            key_info.template_warning = key_info.template_provenance_note
             keys.append(key_info)
             self._key_cache[key_info.address] = key_info
 

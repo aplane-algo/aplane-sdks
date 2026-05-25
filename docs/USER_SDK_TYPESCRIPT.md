@@ -312,8 +312,13 @@ for (const key of keys) {
 - `lsigSize`
 - `isGenericLsig`
 - `signingArgs`
+- `templateProvenanceStatus`
+- `templateProvenanceNote`
 - `templateStatus`
 - `templateWarning`
+
+`templateStatus` and `templateWarning` are legacy aliases for
+`templateProvenanceStatus` and `templateProvenanceNote`.
 
 ### List Key Types
 

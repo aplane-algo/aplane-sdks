@@ -187,8 +187,8 @@ func TestGoSDKMapsTemplateWarningFields(t *testing.T) {
 			"address": "ADDR1",
 			"public_key_hex": "abcd",
 			"key_type": "aplane.timelock.v1",
-			"template_status": "conflict",
-			"template_warning": "template fingerprint differs"
+			"template_provenance_status": "conflict",
+			"template_provenance_note": "template fingerprint differs"
 		}]
 	}`)
 	var resp KeysResponse
@@ -200,6 +200,12 @@ func TestGoSDKMapsTemplateWarningFields(t *testing.T) {
 	}
 	if got := resp.Keys[0].TemplateWarning; got != "template fingerprint differs" {
 		t.Fatalf("TemplateWarning = %q, want template fingerprint differs", got)
+	}
+	if got := resp.Keys[0].TemplateProvenanceStatus; got != "conflict" {
+		t.Fatalf("TemplateProvenanceStatus = %q, want conflict", got)
+	}
+	if got := resp.Keys[0].TemplateProvenanceNote; got != "template fingerprint differs" {
+		t.Fatalf("TemplateProvenanceNote = %q, want template fingerprint differs", got)
 	}
 }
 

@@ -3,7 +3,10 @@
 
 package aplane
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 const maxSignRequestIDLength = 128
 
@@ -19,7 +22,7 @@ const maxSignRequestIDLength = 128
 //   - Foreign mode: txn_bytes_hex without auth_address
 type SignRequest struct {
 	AuthAddress  string            `json:"auth_address,omitempty"`
-	TxnSender    string            `json:"txn_sender,omitempty"`
+	TxnSender    string            `json:"txn_sender,omitempty"` // Advisory display hint; signer authority comes from txn bytes
 	TxnBytesHex  string            `json:"txn_bytes_hex,omitempty"`
 	LsigArgs     map[string]string `json:"lsig_args,omitempty"`
 	LsigSize     int               `json:"lsig_size,omitempty"`
@@ -33,7 +36,10 @@ type AppCallInfo struct {
 	Method string `json:"method,omitempty"`
 }
 
-// SignResponse is the response from signer after signing.
+// SignResponse is the legacy single-transaction response shape.
+//
+// The /sign endpoint returns GroupSignResponse. This type is retained for
+// source compatibility with older client code.
 type SignResponse struct {
 	Approved        bool     `json:"approved"`
 	Signature       string   `json:"signature,omitempty"`
@@ -296,21 +302,57 @@ type KeyTypeInfo struct {
 
 // KeyInfo represents a key returned from the /keys endpoint.
 type KeyInfo struct {
-	Address         string       `json:"address"`
-	PublicKeyHex    string       `json:"public_key_hex"`
-	KeyType         string       `json:"key_type"`
-	LsigSize        int          `json:"lsig_size,omitempty"`
-	IsGenericLsig   bool         `json:"is_generic_lsig,omitempty"`
-	SigningArgs     []SigningArg `json:"signing_args,omitempty"`
-	TemplateStatus  string       `json:"template_status,omitempty"`
-	TemplateWarning string       `json:"template_warning,omitempty"`
+	Address                  string       `json:"address"`
+	PublicKeyHex             string       `json:"public_key_hex"`
+	KeyType                  string       `json:"key_type"`
+	LsigSize                 int          `json:"lsig_size,omitempty"`
+	IsGenericLsig            bool         `json:"is_generic_lsig,omitempty"`
+	SigningArgs              []SigningArg `json:"signing_args,omitempty"`
+	TemplateProvenanceStatus string       `json:"template_provenance_status,omitempty"`
+	TemplateProvenanceNote   string       `json:"template_provenance_note,omitempty"`
+	TemplateStatus           string       `json:"template_status,omitempty"`  // Legacy alias for TemplateProvenanceStatus
+	TemplateWarning          string       `json:"template_warning,omitempty"` // Legacy alias for TemplateProvenanceNote
 }
 
 // KeysResponse is the response from the /keys endpoint.
 type KeysResponse struct {
-	Count  int       `json:"count"`
-	Keys   []KeyInfo `json:"keys"`
-	Locked bool      `json:"-"`
+	Count int       `json:"count"`
+	Keys  []KeyInfo `json:"keys"`
+}
+
+// KeysResult wraps /keys with local locked-signer state. Locked is derived from
+// a 403 locked-signer response and is not part of the /keys JSON payload.
+type KeysResult struct {
+	KeysResponse
+	Locked bool
+}
+
+// UnmarshalJSON accepts both current template_provenance_* fields and legacy
+// template_status/template_warning aliases.
+func (k *KeyInfo) UnmarshalJSON(data []byte) error {
+	type keyInfoAlias KeyInfo
+	var aux keyInfoAlias
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	*k = KeyInfo(aux)
+	normalizeKeyInfoTemplateAliases(k)
+	return nil
+}
+
+func normalizeKeyInfoTemplateAliases(k *KeyInfo) {
+	if k.TemplateProvenanceStatus == "" {
+		k.TemplateProvenanceStatus = k.TemplateStatus
+	}
+	if k.TemplateStatus == "" {
+		k.TemplateStatus = k.TemplateProvenanceStatus
+	}
+	if k.TemplateProvenanceNote == "" {
+		k.TemplateProvenanceNote = k.TemplateWarning
+	}
+	if k.TemplateWarning == "" {
+		k.TemplateWarning = k.TemplateProvenanceNote
+	}
 }
 
 // KeyTypesResponse is the response from the /keytypes endpoint.

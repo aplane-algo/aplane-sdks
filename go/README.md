@@ -239,9 +239,11 @@ signed, err := client.SignTransactions(
 )
 ```
 
-#### `GetKeysResponseWithContext(ctx) (*KeysResponse, error)`
+#### `GetKeysResponseWithContext(ctx) (*KeysResult, error)`
 
-Fetch the raw `/keys` response, including locked-state reporting.
+Fetch the raw `/keys` response plus local locked-state reporting. `Locked` is
+derived from a locked-signer HTTP response and is not part of the `/keys` JSON
+payload.
 
 ```go
 keysResp, err := client.GetKeysResponseWithContext(ctx)

@@ -253,8 +253,13 @@ for _, key := range keys {
 - `LsigSize`
 - `IsGenericLsig`
 - `SigningArgs`
+- `TemplateProvenanceStatus`
+- `TemplateProvenanceNote`
 - `TemplateStatus`
 - `TemplateWarning`
+
+`TemplateStatus` and `TemplateWarning` are legacy aliases for
+`TemplateProvenanceStatus` and `TemplateProvenanceNote`.
 
 ### Get One Key
 

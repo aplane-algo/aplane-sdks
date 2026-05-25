@@ -650,6 +650,8 @@ export class SignerClient {
       // Map snake_case API fields to camelCase TypeScript interface
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw = k as any;
+      const templateProvenanceStatus = raw.template_provenance_status || raw.template_status;
+      const templateProvenanceNote = raw.template_provenance_note || raw.template_warning;
       const keyInfo: KeyInfo = {
         address: k.address,
         publicKeyHex: raw.public_key_hex || "",
@@ -657,8 +659,10 @@ export class SignerClient {
         lsigSize: raw.lsig_size || 0,
         isGenericLsig: raw.is_generic_lsig || false,
         signingArgs,
-        templateStatus: raw.template_status,
-        templateWarning: raw.template_warning,
+        templateProvenanceStatus,
+        templateProvenanceNote,
+        templateStatus: templateProvenanceStatus,
+        templateWarning: templateProvenanceNote,
       };
       keys.push(keyInfo);
       this.keyCache.set(keyInfo.address, keyInfo);

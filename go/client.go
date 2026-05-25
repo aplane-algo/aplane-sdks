@@ -384,8 +384,8 @@ func (c *SignerClient) cachedKeys() []KeyInfo {
 	return keys
 }
 
-// GetKeysResponseWithContext fetches /keys with raw locked-state reporting.
-func (c *SignerClient) GetKeysResponseWithContext(ctx context.Context) (*KeysResponse, error) {
+// GetKeysResponseWithContext fetches /keys with local locked-state reporting.
+func (c *SignerClient) GetKeysResponseWithContext(ctx context.Context) (*KeysResult, error) {
 	reqCtx, cancel := c.requestContext(ctx, inventoryTimeout)
 	defer cancel()
 
@@ -402,7 +402,7 @@ func (c *SignerClient) GetKeysResponseWithContext(ctx context.Context) (*KeysRes
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden {
-		return &KeysResponse{Locked: true}, nil
+		return &KeysResult{Locked: true}, nil
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, ErrAuthentication
@@ -425,9 +425,11 @@ func (c *SignerClient) GetKeysResponseWithContext(ctx context.Context) (*KeysRes
 	c.keyCache = cache
 	c.keyMu.Unlock()
 
-	return &KeysResponse{
-		Count: keysResp.Count,
-		Keys:  keysResp.Keys,
+	return &KeysResult{
+		KeysResponse: KeysResponse{
+			Count: keysResp.Count,
+			Keys:  keysResp.Keys,
+		},
 	}, nil
 }
 

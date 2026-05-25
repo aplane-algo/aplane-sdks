@@ -165,8 +165,8 @@ def test_list_keys_maps_template_warning_fields():
                 "address": "ADDR1",
                 "public_key_hex": "abcd",
                 "key_type": "aplane.timelock.v1",
-                "template_status": "conflict",
-                "template_warning": "template fingerprint differs",
+                "template_provenance_status": "conflict",
+                "template_provenance_note": "template fingerprint differs",
             }
         ],
     })
@@ -176,6 +176,8 @@ def test_list_keys_maps_template_warning_fields():
 
     assert keys[0].template_status == "conflict"
     assert keys[0].template_warning == "template fingerprint differs"
+    assert keys[0].template_provenance_status == "conflict"
+    assert keys[0].template_provenance_note == "template fingerprint differs"
 
 
 def test_plan_group_returns_wire_mutation_report():

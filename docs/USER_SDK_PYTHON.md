@@ -301,8 +301,13 @@ Useful `KeyInfo` fields include:
 - `lsig_size`
 - `is_generic_lsig`
 - `signing_args`
+- `template_provenance_status`
+- `template_provenance_note`
 - `template_status`
 - `template_warning`
+
+`template_status` and `template_warning` are legacy aliases for
+`template_provenance_status` and `template_provenance_note`.
 
 If you need one cached entry by address:
 

@@ -229,6 +229,8 @@ describe("SignerClient", () => {
       assert.equal(keys[1].lsigSize, 3035);
       assert.equal(keys[1].templateStatus, "unavailable");
       assert.equal(keys[1].templateWarning, "template fingerprint unavailable");
+      assert.equal(keys[1].templateProvenanceStatus, "unavailable");
+      assert.equal(keys[1].templateProvenanceNote, "template fingerprint unavailable");
     });
 
     it("throws AuthenticationError on 401", async () => {

@@ -42,8 +42,12 @@ export interface KeyInfo {
   /** Key-file-owned signing arguments for LogicSigs */
   signingArgs?: SigningArg[];
   /** Template provenance status, when the signer reports one */
+  templateProvenanceStatus?: string;
+  /** Human-readable template provenance note */
+  templateProvenanceNote?: string;
+  /** Legacy alias for templateProvenanceStatus */
   templateStatus?: string;
-  /** Human-readable template provenance warning */
+  /** Legacy alias for templateProvenanceNote */
   templateWarning?: string;
 }
 
@@ -282,7 +286,7 @@ export type LsigArgsMap = Record<string, LsigArgs>;
 export interface SignRequest {
   /** Auth address (which key to use for signing) */
   auth_address?: string;
-  /** Actual transaction sender address */
+  /** Advisory display hint; signer authority comes from txn bytes */
   txn_sender?: string;
   /** Transaction bytes (TX + msgpack) as hex */
   txn_bytes_hex?: string;

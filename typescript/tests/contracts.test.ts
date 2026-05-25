@@ -205,8 +205,8 @@ describe("signer API contract fixtures", () => {
             address: "ADDR1",
             public_key_hex: "abcd",
             key_type: "aplane.timelock.v1",
-            template_status: "conflict",
-            template_warning: "template fingerprint differs",
+            template_provenance_status: "conflict",
+            template_provenance_note: "template fingerprint differs",
           },
         ],
       }),
@@ -217,6 +217,8 @@ describe("signer API contract fixtures", () => {
 
     assert.equal(keys[0].templateStatus, "conflict");
     assert.equal(keys[0].templateWarning, "template fingerprint differs");
+    assert.equal(keys[0].templateProvenanceStatus, "conflict");
+    assert.equal(keys[0].templateProvenanceNote, "template fingerprint differs");
   });
 
   it("maps /plan mutation wire fields to public MutationReport fields", async () => {

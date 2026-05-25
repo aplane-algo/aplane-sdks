@@ -152,6 +152,8 @@ class TestListKeys:
         assert keys[1].lsig_size == 3035
         assert keys[1].template_status == "unavailable"
         assert keys[1].template_warning == "template fingerprint unavailable"
+        assert keys[1].template_provenance_status == "unavailable"
+        assert keys[1].template_provenance_note == "template fingerprint unavailable"
 
     def test_auth_error(self):
         client = make_client()
