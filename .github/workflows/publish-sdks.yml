@@ -120,17 +120,36 @@ jobs:
           cp typescript/*.tgz release-assets/
           ls -lh release-assets
 
+      - name: Write GitHub Release notes
+        env:
+          SDK_TAG: ${{ inputs.tag }}
+        run: |
+          cat > release-notes.md <<EOF
+          SDK release packages for $SDK_TAG.
+
+          This is the aplane-sdks repository release. The package-manager
+          artifacts keep their canonical package filenames:
+
+          - \`aplane-$VERSION-py3-none-any.whl\` - Python SDK wheel for the PyPI package \`aplane\`
+          - \`aplane-$VERSION.tar.gz\` - Python SDK source distribution for the PyPI package \`aplane\`
+          - \`aplane-$VERSION.tgz\` - TypeScript SDK npm package tarball for the npm package \`aplane\`
+          - \`aplane-go-sdk-$VERSION.tar.gz\` - Go SDK source archive
+          EOF
+
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           SDK_TAG: ${{ inputs.tag }}
         run: |
           if gh release view "$SDK_TAG" >/dev/null 2>&1; then
+            release_id="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$SDK_TAG" --jq .id)"
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+              -f body="$(cat release-notes.md)" >/dev/null
             gh release upload "$SDK_TAG" release-assets/* --clobber
           else
             gh release create "$SDK_TAG" release-assets/* \
               --title "$SDK_TAG" \
-              --notes "SDK release packages for $SDK_TAG"
+              --notes-file release-notes.md
           fi
 
   publish-pypi:
