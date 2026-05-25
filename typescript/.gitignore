@@ -1,8 +1,0 @@
-# Build output
-dist/
-
-# npm pack output
-*.tgz
-
-# Dependencies
-node_modules/
